@@ -16,12 +16,19 @@ boolean using_mouse = false;
 
 public enum Item_type {VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM, SLOW};
 int type_num = 6;
+public enum Enemy_type {SHY, STALKER, PREDATOR};
 
 public class Item {
   boolean powerUp;
-  boolean isTaken = false;
+  boolean isTaken;
   Item_type type;
   PVector pos;
+  
+  Item() 
+  {
+    isTaken = false;
+    pos = new PVector(0,0);
+  }
   
   Item_type Type(int num)
   {
@@ -48,21 +55,45 @@ public class Item {
 }
 
 public class Pnj {
-  boolean isDead = false;
+  boolean isDead;
+  boolean isWaiting;
     float vel;
     float size;
     float dist;
     float hp;
-    PVector pos = new PVector(random(0, width), random (0, height));
+    PVector pos;
+   
+   Pnj()
+   {
+     isDead = false;
+     isWaiting = true;
+     pos = new PVector(random(0,width), random (0, height));
+   }
+}
+
+public class Enemy {
+  PVector pos;
+  boolean isDead;
+  boolean isAwake;
+  float vel; 
+  float size;
+  Enemy_type type;
+  
+  Enemy() {
+    pos = new PVector(0,0);
+    type = Enemy_type.SHY;
+    isDead = false;
+    isAwake = false;
+  }
 }
 
 public class Timer {
-  boolean isStarted = false;
-  float finalTime = 0;
+  boolean isStarted;
+  float finalTime;
   
   void StartTimer(float time)
   {
-    if (!isStarted)
+    if (CheckTimer())
     {
        finalTime = millis() + time;
        isStarted = true;
@@ -72,13 +103,17 @@ public class Timer {
   {
     if (millis() >= finalTime)
     {
-      isStarted = false;
       return true;
     }
     else
     {
       return false;
     }
+  }
+  
+  Timer()
+  {
+    isStarted = false;
   }
 }
 
@@ -90,69 +125,42 @@ Item[] items;
 int items_num;
 int items_size = 10;
 
+// Variables de Enemy
+Enemy[] enemies;
+int enemy_num;
+int enemy_counter = 0;
+float enemySpawnTime = 5000;
+float enemyMaxVel = 10;
+float enemyMinVel = 5;
+Timer enemyTimer;
+
+int N = 10;
+
+//  SETUP
+
 void setup() {
   // Creamos la ventana
   size(600, 600);
   
+  enemy_num = N;
+  
   //Inicializamos las variables de los PNJ
-  pnj1.vel = 0.5;
-  pnj1.size = 20.0;
-  pnj1.dist = 25.0;
-  pnj1.hp = 100;
-  pnj2.vel = 0.2;
-  pnj2.size = 15.0;
-  pnj2.dist = 75.0;
-  pnj2.hp = 100;
+  InitializePNJs();
   
   // Inicializamos los muros
-  // El número de muros es un número aleatorio entre 6 y 20
-  muros_num = (int)random(6, 20);
-  
-  // Inicializamos el array y la mida de los muros, también es aleatoria.
-  muros = new PVector[muros_num];
-  ancho_muro = width / random(5, 20);
-  alto_muro = height / random(20, 50);
-  
-  // Inicializamos la posición de los muros
-   for (int i=0; i<muros_num; i++) {
-     muros[i] = new PVector(0, 0); // Reservamos cuantas coords por elemento
-     do {  
-     muros[i].x = random(0, width - ancho_muro); // Coord X punto inferior izquierdo
-     muros[i].y = random(0, height - alto_muro); // Coord Y punto inferior izquierdo
-     } while (WallColision(muros[i], ancho_muro, alto_muro, i));
-   }
+  InitializeWalls();
   
   //Inicializamos los ítems
-  //El número de ítems es un número aleatorio
-  items_num = (int)random(6, 12);
+  InitializeItems();
   
-  //Inicializamos el array de ítems
-  items = new Item[items_num];
-  
-  for(int i = 0; i < items_num; i++)
-  {
-    items[i] = new Item();
-    items[i].pos = new PVector(0,0);
-    do 
-    {
-      items[i].pos.x = random(0, width - items_size);
-      items[i].pos.y = random(0, height - items_size);
-    } while (!FreeSpot(items[i].pos, i));
-    if (i < 3)
-    {
-      items[i].powerUp = true;
-      items[i].type = items[i].Type((int)random(0, 3));
-    }
-    else
-    {
-      items[i].powerUp = false;
-      items[i].type = items[i].Type((int)random(4, type_num - 1));
-    }
-  }
+  // Inicializamos los enemigos
+  InitializeEnemies();
   
   // Inicializamos la posicion del jugador en medio de la ventana
   pj_pos = new PVector(width / 2.0, height / 2.0);
 }
+
+//  DRAW
 
 void draw()
 {
@@ -161,22 +169,19 @@ void draw()
   
   //Movimiento del PJ (WASD)
   if (keyPressed) {
-    if (key == 'w' || key == 'W') {
+    if ((key == 'w' || key == 'W') && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
       pj_pos.y -= pj_vel;
     }
-    else if (key == 'd' || key == 'D') {
+    else if ((key == 'd' || key == 'D') && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
       pj_pos.x += pj_vel;
     }
-    else if (key == 'a' || key == 'A') {
+    else if ((key == 'a' || key == 'A') && Borders(2, pj_pos, pj_vel) && !WallBorder(2, pj_pos)) {
       pj_pos.x -= pj_vel;
     }
-    else if (key == 's' || key == 'S') {
+    else if ((key == 's' || key == 'S') && Borders(1, pj_pos, pj_vel) && !WallBorder(1, pj_pos)) {
       pj_pos.y += pj_vel;
     }
-    //float dir_x = keyPressed ? key == 'd' || key == 'D' ? 1 : key == 'a' || key == 'A' ? -1 : 0 : 0;
-    //float dir_y = keyPressed ? key == 's' || key == 'S' ? 1 : key == 'w' || key == 'W' ? -1 : 0 : 0;
-    //pj_pos.x += dir_x * pj_vel;
-    //pj_pos.y += dir_y * pj_vel;
+    
     colision = WallColision(pj_pos, pj_size);
   }
   if (using_mouse)
@@ -184,27 +189,26 @@ void draw()
     pj_pos.y = mouseY;
     pj_pos.x = mouseX;
   }
-  // Si la distancia entre el pj y el pnj1 es mayor a 
-  // la distancia establecida en el pnj1_dist que acerque
-  if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist)
-  {
-    pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
-    pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
-  }
-   if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist)
-  {
-    pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel);
-    pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel);
-  }
-  DrawInstances();
   
-    if (WallColision(pnj2.pos, pnj2.size))
+  PNJLogic();
+  
+  if (enemy_counter < enemy_num)
+  {
+    EnemySpawn();
+  }
+  
+  if (WallColision(pnj2.pos, pnj2.size))
   {
       GetDamage(pnj2, WallDamage);
   }
+  
+  DrawInstances();
+  DrawHUD();
 }
 
-void KeyPressed()
+// EVENTS
+
+void keyPressed()
 {
    if (key == 'g' || key == 'G')
     {
@@ -218,6 +222,8 @@ void KeyPressed()
       }
     }
 }
+
+//  FLOAT FUNCTIONS
 
 float DistanceBetween(PVector point1, PVector point2)
 {
@@ -235,6 +241,8 @@ float MoveAway(float thisPoint, float finalPoint, float speed)
   float move = (1.0 + speed * alfa) * thisPoint - speed * alfa * finalPoint;
   return move;
 }
+
+//  BOOLEAN FUNCTIONS
 
 Boolean FreeSpot(PVector pos, int index)
 {
@@ -254,6 +262,74 @@ Boolean FreeSpot(PVector pos, int index)
     }
   }
   return true;
+}
+
+
+boolean Borders(int dir, PVector p, float speed)
+{
+  switch(dir)
+  {  
+    case(0):
+      if (p.y - speed < 0)
+      {
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+    case(1):
+      if (p.y + speed > height)
+      {
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+    case(2):
+      if (p.x - speed < 0)
+      {
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+    case(3):
+      if (p.x + speed > width)
+      {
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+     default:
+     return false;
+  }
+}
+
+Boolean WallBorder(int dir, PVector p)
+{
+  PVector pos = new PVector(p.x,p.y);
+    switch(dir)
+  {  
+    case(0):
+      pos.y -= pj_size * 2;
+      return WallColision(p, pj_size);
+    case(1):
+      pos.y += pj_size * 2;
+      return WallColision(p, pj_size);
+    case(2):
+      pos.x -= pj_size * 2;
+      return WallColision(p, pj_size);
+    case(3):
+      pos.x += pj_size * 2;
+      return WallColision(p, pj_size);
+     default:
+     return false;
+  }
 }
 
 Boolean WallColision(PVector p, float size)
@@ -312,38 +388,137 @@ Boolean WallColision(PVector p, float size, int index)
         return true;
       }
     }
+    
     return false;
  }
 
 Boolean WallColision(PVector p, float x_size, float y_size, int index)
 {
-    float p_max_x = p.x + x_size / 2;
-    float p_max_y = p.y + y_size / 2;
-    float p_min_x = p.x - x_size / 2;
-    float p_min_y = p.y - y_size / 2;
+  float p_max_x = p.x + x_size / 2;
+  float p_max_y = p.y + y_size / 2;
+  float p_min_x = p.x - x_size / 2;
+  float p_min_y = p.y - y_size / 2;
       
-    for(int i = 0; i < index; i++)
+  for(int i = 0; i < index; i++)
+  {
+    PVector max_muro = new PVector(0,0);
+
+    max_muro.x = muros[i].x + ancho_muro;
+    max_muro.y = muros[i].y + alto_muro;
+     
+    if (p_max_x < max_muro.x - ancho_muro || p_max_y < max_muro.y - alto_muro || max_muro.x < p_min_x || max_muro.y < p_min_y) 
     {
-      PVector max_muro = new PVector(0,0);
-
-      max_muro.x = muros[i].x + ancho_muro;
-      max_muro.y = muros[i].y + alto_muro;
-
-      if (p_max_x < max_muro.x - ancho_muro || p_max_y < max_muro.y - alto_muro || max_muro.x < p_min_x || max_muro.y < p_min_y) 
-      {
-        continue;
-      }
-      else
-      {
-        return true;
-      }
+      continue;
     }
-    return false;
- }
+    else
+    {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// FUNCTIONS
+
+//Initializing functions:
+void InitializePNJs()
+{
+  pnj1.vel = 0.5;
+  pnj1.size = 20.0;
+  pnj1.dist = 25.0;
+  pnj1.hp = 100;
+  pnj2.vel = 0.2;
+  pnj2.size = 15.0;
+  pnj2.dist = 75.0;
+  pnj2.hp = 100;
+}
+
+void InitializeWalls()
+{
+  // El número de muros es un número aleatorio entre 6 y 20
+  muros_num = (int)random(6, 20);
+  
+  // Inicializamos el array y la mida de los muros, también es aleatoria.
+  muros = new PVector[muros_num];
+  ancho_muro = width / random(5, 20);
+  alto_muro = height / random(20, 50);
+  
+  // Inicializamos la posición de los muros
+  for (int i=0; i < muros_num; i++) {
+    muros[i] = new PVector(0, 0); // Reservamos cuantas coords por elemento
+    do {  
+    muros[i].x = random(0, width - ancho_muro); // Coord X punto inferior izquierdo
+    muros[i].y = random(0, height - alto_muro); // Coord Y punto inferior izquierdo
+    } while (WallColision(muros[i], ancho_muro, alto_muro, i) && (muros[i].x > width/2 + ancho_muro || muros[i].x < width/2 - ancho_muro) && (muros[i].y < height/2 - alto_muro || muros[i].y > height/ 2 + alto_muro));
+  }
+}
+
+void InitializeItems()
+{
+    //El número de ítems es un número aleatorio
+  items_num = (int)random(6, 12);
+  
+  //Inicializamos el array de ítems
+  items = new Item[items_num];
+  
+  for(int i = 0; i < items_num; i++)
+  {
+    items[i] = new Item();
+    do 
+    {
+      items[i].pos.x = random(0, width - items_size);
+      items[i].pos.y = random(0, height - items_size);
+    } while (!FreeSpot(items[i].pos, i));
+    if (i < 3)
+    {
+      items[i].powerUp = true;
+      items[i].type = items[i].Type((int)random(0, 3));
+    }
+    else
+    {
+      items[i].powerUp = false;
+      items[i].type = items[i].Type((int)random(4, type_num - 1));
+    }
+  }
+}
+
+void InitializeEnemies()
+{
+  // Inicializamos el array
+  enemies = new Enemy[enemy_num];
+  enemyTimer = new Timer();
+  
+  // Seteamos los tipos de los enemies
+  for (int i = 0; i < enemy_num; i++)
+  {
+    enemies[i] = new Enemy();
+    if (i < enemy_num / 4)
+    {
+      enemies[i].type = Enemy_type.PREDATOR;
+    }
+    else if (i < enemy_num / 2)
+    {
+      enemies[i].type = Enemy_type.STALKER;
+    }
+  }
+}
+
+// Draw functions:
+
+void DrawHUD()
+{
+  fill(255, 0, 0);
+  rect(10, 40, 200, 20);
+  fill(0, 255, 0);
+  float anchoBarra = max(map(pnj2.hp, 0, 100, 0, 200), 0); // Evitar valores negativos.
+  rect(10, 40, anchoBarra, 20);
+}
 
 void DrawInstances()
 {
-   //Pintar al PJ
+   //DIBUJAR AL PJ:
+   
    if (colision)
    {
     fill(0, 255, 0);
@@ -354,7 +529,8 @@ void DrawInstances()
    }
     ellipse(pj_pos.x, pj_pos.y, pj_size, pj_size);
     
-    //Pintar al PNJ1 i 2
+    //DIBUJAR AL PNJ1 Y PNJ2:
+    
     if (!pnj1.isDead)
     {
       fill(0, 0, 255);
@@ -365,7 +541,9 @@ void DrawInstances()
       fill(255, 0, 0);
       ellipse(pnj2.pos.x, pnj2.pos.y, pnj2.size, pnj2.size);
     }
-     
+    
+    //DIBUJAR MUROS:
+    
     rectMode(CENTER);
      for(int i = 0; i < muros_num; i++)
      {
@@ -373,12 +551,115 @@ void DrawInstances()
         rect(muros[i].x + ancho_muro/2.0, muros[i].y + alto_muro/2.0, ancho_muro, alto_muro);
      }
      
+     //DIBUJAR ÍTEMS:
+     
       for(int i = 0; i < items_num; i++)
      {
         fill(0, 255, 0);
         ellipse(items[i].pos.x, items[i].pos.y, items_size, items_size);
-     }
+     }     
+}    
+
+void DrawEnemies(PVector enemy, float size)
+{
+  fill(255);
+  ellipse(enemy.x, enemy.y, size, size);
 }
+
+// Enemy Manager:
+
+void EnemySpawn()
+{
+  if (!enemyTimer.isStarted)
+  {
+    enemyTimer.StartTimer(enemySpawnTime);
+  }
+  else if (enemyTimer.CheckTimer())
+  {
+    GenerateEnemy();
+  }
+}
+
+void GenerateEnemy() {
+  int enemyId = 0;
+  do 
+  {
+    enemyId = (int)random(0, enemy_num);
+  } while(enemies[enemyId].isAwake && enemies[enemyId].isDead);
+  
+  int spawn = int(random(4)); // Aparece en uno de los cuatro lados de manera aleatoria.
+  switch (spawn) {
+    case 0: // Arriba
+      enemies[enemy_counter].pos.x = random(width);
+      enemies[enemy_counter].pos.y = 0;
+      break;
+    case 1: // Abajo
+      enemies[enemy_counter].pos.x = random(width);
+      enemies[enemy_counter].pos.y = height;
+      break;
+    case 2: // Izquierda
+      enemies[enemy_counter].pos.x = 0;
+      enemies[enemy_counter].pos.y = random(height);
+      break;
+    case 3: // Derecha
+      enemies[enemy_counter].pos.x = width;
+      enemies[enemy_counter].pos.y = random(height);
+      break;
+     default:
+  }  
+  enemies[enemyId].isAwake = true;
+  enemy_counter++;
+}
+
+void EnemyVel(Enemy enemy)
+{
+  enemy.vel = random(enemyMinVel, enemyMaxVel);
+}
+
+
+// Other Functions
+
+void PNJLogic()
+{
+   // good PNJ movement:
+  
+  // Si la distancia entre el pj y el pnj1 es mayor a 
+  // la distancia establecida en el pnj1_dist que acerque
+  if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist)
+  {
+    pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
+    pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
+  }
+   if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist)
+  {
+    pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel);
+    pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel);
+  }
+  
+  // Enemies movement
+  for (int i = 0; i < enemy_num; i++)
+  {
+    if (enemies[i].isAwake && !enemies[i].isDead)
+    {
+      switch (enemies[i].type)
+      {
+        case PREDATOR:
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel);
+          break;
+        case SHY:
+          enemies[i].pos.x = MoveAway(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel);
+          enemies[i].pos.y = MoveAway(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel);
+          break;
+        case STALKER: 
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj1.pos.x, enemies[i].vel);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj1.pos.y, enemies[i].vel);
+      }
+      DrawEnemies(enemies[i].pos, enemies[i].size);
+    }
+  }
+}
+
 
 void GetDamage(Pnj pnj, float damage)
 {
