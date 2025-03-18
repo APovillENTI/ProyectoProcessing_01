@@ -1,3 +1,9 @@
+int SPEED_TIME = 5000; 
+int FREEZE_TIME = 3000; 
+int INMORTAL_TIME = 5000;
+int VENOM_TIME = 10000;
+int SLOW_TIME = 3000;
+
 //Variables de muros
 PVector[] muros;
 float ancho_muro, alto_muro;
@@ -5,7 +11,7 @@ float WallDamage = 0.5;
 int muros_num;
 
 //Variables de Jugador
-float pj_vel = 5;
+float pj_vel = 3;
 float pj_size = 20;
 PVector pj_pos;
 
@@ -14,8 +20,10 @@ boolean colision = false;
 
 boolean using_mouse = false;
 
+//Enum del Item
 public enum Item_type {VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM, SLOW};
 int type_num = 6;
+//Enum del Enemy
 public enum Enemy_type {SHY, STALKER, PREDATOR};
 
 public class Item {
@@ -23,9 +31,12 @@ public class Item {
   boolean isTaken;
   Item_type type;
   PVector pos;
+  Timer effectTimer;
+  float effectTime;
   
   Item() 
   {
+    effectTimer = new Timer();
     isTaken = false;
     pos = new PVector(0,0);
   }
@@ -34,7 +45,7 @@ public class Item {
   {
     switch(num)
     {
-      case 0: 
+      case 0:
         return Item_type.VEL;
       case 1:
         return Item_type.FREEZE;
@@ -77,13 +88,20 @@ public class Enemy {
   boolean isAwake;
   float vel; 
   float size;
+  float detectionDistance;
+  float speedIncrement;
   Enemy_type type;
+  Timer speedTimer;
   
   Enemy() {
+    speedIncrement = 0.1;
+    speedTimer = new Timer();
     pos = new PVector(0,0);
     type = Enemy_type.SHY;
+    size = 10;
     isDead = false;
     isAwake = false;
+    detectionDistance = 50;
   }
 }
 
@@ -93,7 +111,7 @@ public class Timer {
   
   void StartTimer(float time)
   {
-    if (CheckTimer())
+    if (!isStarted)
     {
        finalTime = millis() + time;
        isStarted = true;
@@ -103,6 +121,7 @@ public class Timer {
   {
     if (millis() >= finalTime)
     {
+      isStarted = false;
       return true;
     }
     else
@@ -130,8 +149,12 @@ Enemy[] enemies;
 int enemy_num;
 int enemy_counter = 0;
 float enemySpawnTime = 5000;
-float enemyMaxVel = 10;
-float enemyMinVel = 5;
+float enemySpeedTime = 2500;
+float enemyMaxVel = 0.3;
+float enemyMinVel = 0.05;
+float enemyDamage = 0.5;
+float pjEnemyOffset;
+float pnj2EnemyOffset;
 Timer enemyTimer;
 
 int N = 10;
@@ -169,16 +192,16 @@ void draw()
   
   //Movimiento del PJ (WASD)
   if (keyPressed) {
-    if ((key == 'w' || key == 'W') && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
+    if ((key == 'w' || key == 'W')) { // && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
       pj_pos.y -= pj_vel;
     }
-    else if ((key == 'd' || key == 'D') && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
+    else if ((key == 'd' || key == 'D')) { // && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
       pj_pos.x += pj_vel;
     }
-    else if ((key == 'a' || key == 'A') && Borders(2, pj_pos, pj_vel) && !WallBorder(2, pj_pos)) {
+    else if ((key == 'a' || key == 'A')) { // && Borders(2, pj_pos, pj_vel) && !WallBorder(2, pj_pos)) {
       pj_pos.x -= pj_vel;
     }
-    else if ((key == 's' || key == 'S') && Borders(1, pj_pos, pj_vel) && !WallBorder(1, pj_pos)) {
+    else if ((key == 's' || key == 'S')) { // && Borders(1, pj_pos, pj_vel) && !WallBorder(1, pj_pos)) {
       pj_pos.y += pj_vel;
     }
     
@@ -424,14 +447,15 @@ Boolean WallColision(PVector p, float x_size, float y_size, int index)
 //Initializing functions:
 void InitializePNJs()
 {
-  pnj1.vel = 0.5;
+  pnj1.vel = 0.1;
   pnj1.size = 20.0;
   pnj1.dist = 25.0;
   pnj1.hp = 100;
-  pnj2.vel = 0.2;
+  pnj2.vel = 0.15;
   pnj2.size = 15.0;
   pnj2.dist = 75.0;
   pnj2.hp = 100;
+  pnj2.isWaiting = true;
 }
 
 void InitializeWalls()
@@ -480,6 +504,26 @@ void InitializeItems()
       items[i].powerUp = false;
       items[i].type = items[i].Type((int)random(4, type_num - 1));
     }
+    switch (items[i].type)
+    {
+      case VEL:
+        items[i].effectTime = SPEED_TIME;
+        break;
+      case FREEZE:
+        items[i].effectTime = FREEZE_TIME;
+        break;
+      case INMORTAL:
+        items[i].effectTime = INMORTAL_TIME;
+        break;
+      case VENOM:
+        items[i].effectTime = VENOM_TIME;
+        break;
+      case SLOW:
+        items[i].effectTime = SLOW_TIME;
+        break:
+      default:
+    }
+    //VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM, SLOW
   }
 }
 
@@ -501,7 +545,14 @@ void InitializeEnemies()
     {
       enemies[i].type = Enemy_type.STALKER;
     }
+    else
+    {
+      enemies[i].type = Enemy_type.SHY;
+    }
+    enemies[i].vel = enemyMinVel;
   }
+  pjEnemyOffset = pj_size / 2 + enemies[0].size;
+  pnj2EnemyOffset = pnj2.size / 2 + enemies[0].size;
 }
 
 // Draw functions:
@@ -564,6 +615,7 @@ void DrawEnemies(PVector enemy, float size)
 {
   fill(255);
   ellipse(enemy.x, enemy.y, size, size);
+  println(enemies[0].vel);
 }
 
 // Enemy Manager:
@@ -574,14 +626,14 @@ void EnemySpawn()
   {
     enemyTimer.StartTimer(enemySpawnTime);
   }
-  else if (enemyTimer.CheckTimer())
+  if (enemyTimer.CheckTimer())
   {
     GenerateEnemy();
   }
 }
 
 void GenerateEnemy() {
-  int enemyId = 0;
+  int enemyId;
   do 
   {
     enemyId = (int)random(0, enemy_num);
@@ -591,31 +643,26 @@ void GenerateEnemy() {
   switch (spawn) {
     case 0: // Arriba
       enemies[enemy_counter].pos.x = random(width);
-      enemies[enemy_counter].pos.y = 0;
+      enemies[enemy_counter].pos.y = enemies[enemy_counter].size;
       break;
     case 1: // Abajo
       enemies[enemy_counter].pos.x = random(width);
-      enemies[enemy_counter].pos.y = height;
+      enemies[enemy_counter].pos.y = height - enemies[enemy_counter].size;
       break;
     case 2: // Izquierda
-      enemies[enemy_counter].pos.x = 0;
+      enemies[enemy_counter].pos.x = enemies[enemy_counter].size;
       enemies[enemy_counter].pos.y = random(height);
       break;
     case 3: // Derecha
-      enemies[enemy_counter].pos.x = width;
+      enemies[enemy_counter].pos.x = width - enemies[enemy_counter].size;
       enemies[enemy_counter].pos.y = random(height);
       break;
      default:
   }  
+  enemyTimer.StartTimer(enemySpawnTime);
   enemies[enemyId].isAwake = true;
   enemy_counter++;
 }
-
-void EnemyVel(Enemy enemy)
-{
-  enemy.vel = random(enemyMinVel, enemyMaxVel);
-}
-
 
 // Other Functions
 
@@ -630,12 +677,21 @@ void PNJLogic()
     pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
     pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
   }
-   if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist)
+  if (pnj2.isWaiting)
+  {
+    if (DistanceBetween(pnj2.pos, pj_pos) < pnj2.dist)
+    {
+      pnj2.isWaiting = false;
+    }
+  }
+  else if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist)
   {
     pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel);
     pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel);
   }
   
+  
+
   // Enemies movement
   for (int i = 0; i < enemy_num; i++)
   {
@@ -644,22 +700,56 @@ void PNJLogic()
       switch (enemies[i].type)
       {
         case PREDATOR:
-          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel);
-          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel);
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2);
           break;
         case SHY:
-          enemies[i].pos.x = MoveAway(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel);
-          enemies[i].pos.y = MoveAway(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel);
+        if (DistanceBetween(enemies[i].pos, pj_pos) < enemies[i].detectionDistance)
+        {
+          enemies[i].pos.x = MoveAway(enemies[i].pos.x ,pj_pos.x, enemies[i].vel);
+          enemies[i].pos.y = MoveAway(enemies[i].pos.y ,pj_pos.y, enemies[i].vel);
+        }
+        else
+        {
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2);
+        }
           break;
         case STALKER: 
           enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj1.pos.x, enemies[i].vel);
           enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj1.pos.y, enemies[i].vel);
       }
+
+      if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset)
+      {
+        enemies[i].isDead = true;
+      }
+      if (DistanceBetween(pnj2.pos, enemies[i].pos) < pnj2EnemyOffset)
+      {
+        GetDamage(pnj2, enemyDamage);
+      }
+
+      EnemyVel(enemies[i]);
       DrawEnemies(enemies[i].pos, enemies[i].size);
     }
   }
 }
 
+void EnemyVel(Enemy enemy)
+{
+  if (!enemy.speedTimer.isStarted)
+  {
+    enemy.speedTimer.StartTimer(enemySpeedTime);
+  }
+  if (enemy.speedTimer.CheckTimer())
+  {
+    enemy.speedIncrement = random(enemyMinVel, enemyMaxVel);
+  }
+  else
+  {
+     enemy.vel += enemy.vel > enemyMaxVel ? -0.01 : enemy.vel < enemyMinVel ? 0.01 : enemy.speedIncrement;
+  } 
+}
 
 void GetDamage(Pnj pnj, float damage)
 {
