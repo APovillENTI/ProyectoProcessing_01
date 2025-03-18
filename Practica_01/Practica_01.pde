@@ -3,6 +3,8 @@ int FREEZE_TIME = 3000;
 int INMORTAL_TIME = 5000;
 int VENOM_TIME = 10000;
 int SLOW_TIME = 3000;
+float CURE_ITEM = 50;
+float DAMAGE_ITEM = 30;
 
 //Variables de muros
 PVector[] muros;
@@ -143,6 +145,12 @@ Pnj pnj2 = new Pnj();
 Item[] items;
 int items_num;
 int items_size = 10;
+boolean poisoned = false;
+boolean frozen = false;
+boolean inmortal = false;
+float slowDown = 1;
+float speedUp = 1;
+
 
 // Variables de Enemy
 Enemy[] enemies;
@@ -664,6 +672,45 @@ void GenerateEnemy() {
   enemy_counter++;
 }
 
+// Items logic
+
+void GetItem(Item item)
+{
+  switch(item.type)
+  {
+    case VEL:
+      speedUp = 2;
+      break;
+    case FREEZE:
+      for (int i = 0; i < enemy_num; i++)
+      {
+        if (enemies[i].isAwake)
+        {
+          enemies[i].vel = 0;
+          frozen = true;
+        }
+      }
+      break;
+    case INMORTAL:
+      inmortal = true;
+      break;
+    case CURE:
+      pnj2.hp += CURE_ITEM;
+      break;
+    case DAMAGE:
+      pnj2.hp -= DAMAGE_ITEM
+      break;
+    case VENOM:
+      poisoned = true;
+      break;
+    case SLOW:
+      slowDown = 0.5;
+      break:
+    default:
+  }
+  item.isTaken = true;
+}
+
 // Other Functions
 
 void PNJLogic()
@@ -674,8 +721,8 @@ void PNJLogic()
   // la distancia establecida en el pnj1_dist que acerque
   if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist)
   {
-    pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
-    pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
+    pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel * speedUp);
+    pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel * speedUp);
   }
   if (pnj2.isWaiting)
   {
@@ -686,8 +733,8 @@ void PNJLogic()
   }
   else if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist)
   {
-    pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel);
-    pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel);
+    pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel * speedUp);
+    pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel * speedUp);
   }
   
   
@@ -700,24 +747,24 @@ void PNJLogic()
       switch (enemies[i].type)
       {
         case PREDATOR:
-          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2);
-          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2);
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2 * slowDown);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2 * slowDown);
           break;
         case SHY:
         if (DistanceBetween(enemies[i].pos, pj_pos) < enemies[i].detectionDistance)
         {
-          enemies[i].pos.x = MoveAway(enemies[i].pos.x ,pj_pos.x, enemies[i].vel);
-          enemies[i].pos.y = MoveAway(enemies[i].pos.y ,pj_pos.y, enemies[i].vel);
+          enemies[i].pos.x = MoveAway(enemies[i].pos.x ,pj_pos.x, enemies[i].vel * slowDown);
+          enemies[i].pos.y = MoveAway(enemies[i].pos.y ,pj_pos.y, enemies[i].vel * slowDown);
         }
         else
         {
-          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2);
-          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2);
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2 * slowDown);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2 * slowDown);
         }
           break;
         case STALKER: 
-          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj1.pos.x, enemies[i].vel);
-          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj1.pos.y, enemies[i].vel);
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj1.pos.x, enemies[i].vel * slowDown);
+          enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj1.pos.y, enemies[i].vel * slowDown);
       }
 
       if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset)
@@ -747,7 +794,7 @@ void EnemyVel(Enemy enemy)
   }
   else
   {
-     enemy.vel += enemy.vel > enemyMaxVel ? -0.01 : enemy.vel < enemyMinVel ? 0.01 : enemy.speedIncrement;
+     enemy.vel += enemy.vel > enemyMaxVel * slowDown ? -0.01 : enemy.vel < enemyMinVel * slowDown ? 0.01 : enemy.speedIncrement;
   } 
 }
 
