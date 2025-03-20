@@ -21,7 +21,7 @@ color cian = color(165, 244, 255); // Para los enemigos congelados (Frozen)
 color verde = color(0, 205, 0); // Para los items
 color amarillo = color(250, 250, 0); // Para el efecto de velociad
 color naranja = color(250, 150, 0); // Para el PNJ1
-color azul = color(0, 250, 0); // Para el PNJ2
+color azul = color(0, 0, 250); // Para el PNJ2
 color blanco = color(255, 255, 255); // Para la inmortalidad
 color turquesa = color(0, 250, 160); // Para el PJ
 
@@ -64,7 +64,7 @@ public class Item {
     pos = new PVector(0,0);
   }
   
-  Item_type Type(int num) // Este método sirve para asignarle un efecto aleatorio al item
+  Item_type Type(int num) // Este método sirve para asignarle un efecto aleatorio al item (haciendo que num sea un numero aleatorio)
   {
     switch(num)
     {
@@ -75,9 +75,9 @@ public class Item {
       case 2: 
         return Item_type.INMORTAL;
       case 3: 
-        return Item_type.CURE;
+        return Item_type.CURE; // (si num <= 3, siempre será powerUp)
       case 4: 
-        return Item_type.DAMAGE;
+        return Item_type.DAMAGE; 
       case 5:
         return Item_type.VENOM;
       default:
@@ -185,14 +185,16 @@ float enemySpeedTime = 2500; // Tiempo que tarda en variar la velocidad del enem
 //Velocidad Max y min del enemy (variará dentro de este rango)
 float enemyMaxVel = 0.3;
 float enemyMinVel = 0.05;
-float enemyDamage = 0.5; // Dna
+float enemyDamage = 0.5; // Daño que ejerce el enemigo al colisionar
 
-float pjEnemyOffset;
-float pnj2EnemyOffset;
+float pjEnemyOffset; // Es la distancia que debe de haber para que el player colisione con el enemigo y lo mate
+float pnj2EnemyOffset; // La distancia entre el PNJ2 y el enemigo
+float pjItemOffset;
+
 color enemy_color = rojo;
-Timer enemyTimer;
+Timer enemyTimer; // Se utiliza para paulatinar el spawn de enemigos
 
-int N = 10;
+int N = 10; // Numero que debe decidir el jugador y se relaciona con el numero total de enemigos
 
 //  SETUP
 
@@ -203,7 +205,7 @@ void setup() {
   enemy_num = N;
   
   //Inicializamos las variables de los PNJ
-  InitializePNJs();
+  InitializePNJs(); 
   
   // Inicializamos los muros
   InitializeWalls();
@@ -228,7 +230,7 @@ void draw()
   //Movimiento del PJ (WASD)
   if (keyPressed) {
     if ((key == 'w' || key == 'W')) { // && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
-      pj_pos.y -= pj_vel * speedUp;
+      pj_pos.y -= pj_vel * speedUp; // SpeedUp es 1 normalmente, cuando se recoge un item de velocidad se duplica
     }
     else if ((key == 'd' || key == 'D')) { // && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
       pj_pos.x += pj_vel * speedUp;
@@ -246,83 +248,63 @@ void draw()
     pj_pos.x = mouseX;
   }
   
-  PNJLogic();
+  PNJLogic(); 
   
   if (enemy_counter < enemy_num)
   {
-    EnemySpawn();
+    EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = enemy_num (dejaran de spawnear más)
   }
   
   if (WallColision(pnj2.pos, pnj2.size))
   {
-      GetDamage(pnj2, WallDamage);
+      GetDamage(pnj2, WallDamage); // Si el PNJ2 colisiona con un muro, recibe daño
   }
   
   for (int i = 0; i < items_num; i++)
   {
-    if (!items[i].isTaken && DistanceBetween(items[i].pos, pj_pos) < (items_size + pj_size) / 2)
+    if (!items[i].isTaken && DistanceBetween(items[i].pos, pj_pos) < pjItemOffset) // Detectamos si el player colisiona con un item que no haya sido recogido aún
     {
-      items[i].effectTimer.StartTimer(items[i].effectTime);
-      items[i].isTaken = true;
-      GetItem(items[i]);
+      items[i].effectTimer.StartTimer(items[i].effectTime); // Se activa el Timer del efecto
+      items[i].isTaken = true; // Marcamos como recogido
+      GetItem(items[i]); // Logica de recoger el Item
     }
   }
   
-  ItemCheck();
+  ItemCheck(); // Chequeamos si los efectos de los items siguen haciendo efecto
   
   if (poisoned)
   {
-    pnj2.hp -= VENOM_DAMAGE;
+    pnj2.hp -= VENOM_DAMAGE; // El item de veneno daña al PNJ2
   }
   
-  DrawInstances();
-  DrawHUD();
+  DrawInstances(); // Dibujamos las instancias
+  DrawHUD(); // Dibujamos el HUD
 }
 
 // EVENTS
 
 void keyPressed()
 {
-   if (key == 'g' || key == 'G')
+   if (key == 'g' || key == 'G') // Si se pulsa G, el modo de movimiento varia entre Mouse y WASD
     {
-      if (using_mouse)
-      {
-        using_mouse = false;
-      }
-      else
-      {
-        using_mouse = true;
-      }
+        using_mouse = !using_mouse;
     }
-}
-
-void mouseMoved()
-{
-  for (int i = 0; i < items_num; i++)
-  {
-    if (DistanceBetween(items[i].pos, pj_pos) < (items_size + pj_size) / 2)
-    {
-      items[i].effectTimer.StartTimer(items[i].effectTime);
-      items[i].isTaken = true;
-      GetItem(items[i]);
-    }
-  }
 }
 
 //  FLOAT FUNCTIONS
 
-float DistanceBetween(PVector point1, PVector point2)
+float DistanceBetween(PVector point1, PVector point2) // Devuelve la distancia entre dos puntos
 {
-  return sqrt(pow(point2.x - point1.x, 2.0) + pow(point2.y - point1.y, 2.0));
+  return sqrt(pow(point2.x - point1.x, 2.0) + pow(point2.y - point1.y, 2.0)); // Se hace el modulo del vector del punto 1 al punto 2
 }
 
-float MoveTowards(float thisPoint, float finalPoint, float speed)
+float MoveTowards(float thisPoint, float finalPoint, float speed) // da la dirección del thisPoint para ir hasta finalPoint
 {
   float move = (1.0 - speed * alfa) * thisPoint + speed * alfa * finalPoint;
   return move;
 }
 
-float MoveAway(float thisPoint, float finalPoint, float speed)
+float MoveAway(float thisPoint, float finalPoint, float speed) // da la dirección del thisPoint para alejar-se de finalPoint
 {
   float move = (1.0 + speed * alfa) * thisPoint - speed * alfa * finalPoint;
   return move;
@@ -330,19 +312,15 @@ float MoveAway(float thisPoint, float finalPoint, float speed)
 
 //  BOOLEAN FUNCTIONS
 
-Boolean FreeSpot(PVector pos, int index)
+Boolean FreeSpot(PVector pos, int index) // Devuelve true si encuentra un sitio libre para instanciar un item
 {
-  if (WallColision(pos, items_size))
+  if (WallColision(pos, items_size)) // Mira si está colisionando con un muro
   {
     return false;
   }
   for(int i = 0; i < index; i++)
   {
-    if (DistanceBetween(pos, items[i].pos) >= items_size)
-    {
-      continue;
-    }
-    else
+    if (DistanceBetween(pos, items[i].pos) < items_size) // Mira si está colisionando con un item
     {
       return false;
     }
@@ -351,12 +329,12 @@ Boolean FreeSpot(PVector pos, int index)
 }
 
 
-boolean Borders(int dir, PVector p, float speed)
+boolean Borders(int dir, PVector p, float speed) // Las colisiones con los bordes de la pantalla
 {
-  switch(dir)
+  switch(dir) 
   {  
-    case(0):
-      if (p.y - speed < 0)
+    case(0): //Arriba
+      if (p.y - speed < 0) // si la posicion p.y menos la velocidad és menor que 0 (colisiona con el borde superior)
       {
         return false;
       }
@@ -364,7 +342,7 @@ boolean Borders(int dir, PVector p, float speed)
       {
         return true;
       }
-    case(1):
+    case(1): //Abajo
       if (p.y + speed > height)
       {
         return false;
@@ -373,7 +351,7 @@ boolean Borders(int dir, PVector p, float speed)
       {
         return true;
       }
-    case(2):
+    case(2): //Izquierda
       if (p.x - speed < 0)
       {
         return false;
@@ -382,7 +360,7 @@ boolean Borders(int dir, PVector p, float speed)
       {
         return true;
       }
-    case(3):
+    case(3): //Derecha
       if (p.x + speed > width)
       {
         return false;
@@ -396,7 +374,7 @@ boolean Borders(int dir, PVector p, float speed)
   }
 }
 
-Boolean WallBorder(int dir, PVector p)
+Boolean WallBorder(int dir, PVector p) // Indica si se está colisionando con un muro (no funciona)
 {
   PVector pos = new PVector(p.x,p.y);
     switch(dir)
@@ -418,21 +396,23 @@ Boolean WallBorder(int dir, PVector p)
   }
 }
 
-Boolean WallColision(PVector p, float size)
+Boolean WallColision(PVector p, float size) // Colision entre un PVector p y su size con algún muro
 {
-    float p_max_x = p.x + size / 2;
+  //Buscamos los puntos maximos y minimos de p
+    float p_max_x = p.x + size / 2; 
     float p_max_y = p.y + size / 2;
     float p_min_x = p.x - size / 2;
     float p_min_y = p.y - size / 2;
       
-    for(int i = 0; i < muros_num; i++)
+    for(int i = 0; i < muros_num; i++) //Repasamos el array de muros
     {
-      PVector max_muro = new PVector(0,0);
+      PVector max_muro = new PVector(0,0); 
 
-      max_muro.x = muros[i].x + ancho_muro;
+  //Buscamos las máximas del muro i
+      max_muro.x = muros[i].x + ancho_muro; 
       max_muro.y = muros[i].y + alto_muro;
 
-      if (p_max_x < max_muro.x - ancho_muro || p_max_y < max_muro.y - alto_muro || max_muro.x < p_min_x || max_muro.y < p_min_y) 
+      if (p_max_x < max_muro.x - ancho_muro || p_max_y < max_muro.y - alto_muro || max_muro.x < p_min_x || max_muro.y < p_min_y) //Buscamos si NO colisiona
       {
         continue;
       }
@@ -444,8 +424,9 @@ Boolean WallColision(PVector p, float size)
     return false;
  }
 
-Boolean WallColision(PVector p, int index)
+Boolean WallColision(PVector p, int index) // Colision entre dos muros (para inicializarlos sin que está uno encima del otro)
 {
+  //p ya es el punto minimo, así que el punto max se le suma a p el tamaño
   float p_max_x = p.x + ancho_muro;
   float p_max_y = p.y + alto_muro;
   float p_min_x = p.x;
@@ -478,7 +459,6 @@ void InitializePNJs()
   pnj1.vel = 0.1;
   pnj1.size = 20.0;
   pnj1.dist = 25.0;
-  pnj1.hp = 100;
   pnj1.tint = naranja;
   pnj2.vel = 0.15;
   pnj2.size = 15.0;
@@ -505,12 +485,13 @@ void InitializeWalls()
     muros[i].x = random(0, width - ancho_muro); // Coord X punto inferior izquierdo
     muros[i].y = random(0, height - alto_muro); // Coord Y punto inferior izquierdo
     } while (WallColision(muros[i], i) && (muros[i].x > width/2 + ancho_muro || muros[i].x < width/2 - ancho_muro) && (muros[i].y < height/2 - alto_muro || muros[i].y > height/ 2 + alto_muro));
-  }
+    // Miramos que en la posicion en la que queremos crear el muro no hay ningun muro y que no esté en el centro, que es donde aparece el pj
+}
 }
 
 void InitializeItems()
 {
-    //El número de ítems es un número aleatorio
+  //El número de ítems es un número aleatorio
   items_num = (int)random(6, 12);
   
   //Inicializamos el array de ítems
@@ -523,18 +504,18 @@ void InitializeItems()
     {
       items[i].pos.x = random(0, width - items_size);
       items[i].pos.y = random(0, height - items_size);
-    } while (!FreeSpot(items[i].pos, i));
-    if (i < 3)
+    } while (!FreeSpot(items[i].pos, i)); // Miramos que no haya un muro u otro item en el lugar en el que queremos poner el siguiente
+    if (i < 3) // los tres primeros items del array seran powerUps
     {
       items[i].powerUp = true;
-      items[i].type = items[i].Type((int)random(0, 3));
+      items[i].type = items[i].Type((int)random(0, 3)); // Elige un efecto aleatorio
     }
-    else
+    else // Los demas seran powerDowns
     {
       items[i].powerUp = false;
-      items[i].type = items[i].Type((int)random(3, type_num));
+      items[i].type = items[i].Type((int)random(3, type_num)); 
     }
-    switch (items[i].type)
+    switch (items[i].type) // Seteamos el tiempo que durará el efecto según el tipo de item
     {
       case VEL:
         items[i].effectTime = SPEED_TIME;
@@ -552,8 +533,9 @@ void InitializeItems()
         items[i].effectTime = 0;
     }
     //VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM
-    println(items[i].type);
+    println(items[i].type); // Esto hay que quitar-lo de caras al definitivo
   }
+  pjItemOffset = (items_size + pj_size) / 2;
 }
 
 void InitializeEnemies()
@@ -566,17 +548,17 @@ void InitializeEnemies()
   for (int i = 0; i < enemy_num; i++)
   {
     enemies[i] = new Enemy();
-    if (i < enemy_num / 4)
+    if (i < enemy_num / 4) // Un 25% irá a por el pnj2
     {
-      enemies[i].type = Enemy_type.PREDATOR;
+      enemies[i].type = Enemy_type.PREDATOR; 
     }
-    else if (i < enemy_num / 2)
+    else if (i < enemy_num / 2) // Otro 25% irá a por el pnj1
     {
       enemies[i].type = Enemy_type.STALKER;
     }
     else
     {
-      enemies[i].type = Enemy_type.SHY;
+      enemies[i].type = Enemy_type.SHY; // El resto irá a por el pnj2 però huirá del pj
     }
     enemies[i].vel = enemyMinVel;
   }
@@ -586,7 +568,7 @@ void InitializeEnemies()
 
 // Draw functions:
 
-void DrawHUD()
+void DrawHUD() // Dibujar el HUD
 {
   fill(255, 0, 0);
   rect(10, 40, 200, 20);
@@ -595,10 +577,10 @@ void DrawHUD()
   rect(10, 40, anchoBarra, 20);
 }
 
-void DrawInstances()
+void DrawInstances() // Dibujamos las instancias
 {
    //DIBUJAR AL PJ:
-   if (WallColision(pj_pos, pj_size))
+   if (WallColision(pj_pos, pj_size)) //Cambiamos de color cuando colisione con un muro (más que nada es para ver si funcionan las colisiones)
    {
     fill(0,0,0);
    }
@@ -610,11 +592,9 @@ void DrawInstances()
     
     //DIBUJAR AL PNJ1 Y PNJ2:
     
-    if (!pnj1.isDead)
-    {
-      fill(pnj1.tint);
-      ellipse(pnj1.pos.x, pnj1.pos.y, pnj1.size, pnj1.size);
-    }
+    fill(pnj1.tint);
+    ellipse(pnj1.pos.x, pnj1.pos.y, pnj1.size, pnj1.size);
+
     if (!pnj2.isDead)
     {
       fill(pnj2.tint);
@@ -623,13 +603,6 @@ void DrawInstances()
     
     //DIBUJAR MUROS:
     
-    rectMode(CENTER);
-     //for(int i = 0; i < muros_num; i++)
-     //{
-     //   fill(255, 0, 0);
-     //   rect(muros[i].x, muros[i].y, ancho_muro, alto_muro);
-     //}
-     
      rectMode(CENTER);
      for(int i = 0; i < muros_num; i++)
      {
@@ -660,13 +633,13 @@ void DrawEnemies(PVector enemy, float size)
 
 void EnemySpawn()
 {
-  if (!enemyTimer.isStarted)
+  if (!enemyTimer.isStarted) // Si el tiempo no está iniciado
   {
-    enemyTimer.StartTimer(enemySpawnTime);
+    enemyTimer.StartTimer(enemySpawnTime); // Inicia el timer
   }
-  if (enemyTimer.CheckTimer())
+  if (enemyTimer.CheckTimer()) // Chequea si el timer ha terminado (devuelve true/false)
   {
-    GenerateEnemy();
+    GenerateEnemy(); // Genera enemigo
   }
 }
 
@@ -674,8 +647,8 @@ void GenerateEnemy() {
   int enemyId;
   do 
   {
-    enemyId = (int)random(0, enemy_num);
-  } while(enemies[enemyId].isAwake && enemies[enemyId].isDead);
+    enemyId = (int)random(0, enemy_num); // Generamos un index del array aleatorio, para que se cree un enemigo aleatorio de todo el array de enemigos
+  } while(enemies[enemyId].isAwake || enemies[enemyId].isDead); // Nos aseguramos que el enemigo no esté ya spawneado y que tampoco esté muerto
   
   int spawn = int(random(4)); // Aparece en uno de los cuatro lados de manera aleatoria.
   switch (spawn) {
@@ -697,9 +670,9 @@ void GenerateEnemy() {
       break;
      default:
   }  
-  enemyTimer.StartTimer(enemySpawnTime);
-  enemies[enemyId].isAwake = true;
-  enemy_counter++;
+  enemyTimer.StartTimer(enemySpawnTime); // Iniciamos el timer del siguiente Spawn
+  enemies[enemyId].isAwake = true; 
+  enemy_counter++; // Contador suma para que cuando llegue a enemy_num no spawneen más enemigos
 }
 
 // Items logic
@@ -709,13 +682,13 @@ void GetItem(Item item)
   item.isTaken = true;
   switch(item.type)
   {
-    case VEL:
-      speedUp = 2;
+    case VEL: 
+      speedUp = 2; // Este numero multiplica la velocidad general del pj
       pj_color = amarillo;
       break;
     case FREEZE:
       enemy_color = cian;
-      for (int i = 0; i < enemy_num; i++)
+      for (int i = 0; i < enemy_num; i++) // Detiene a los enemigos durante un tiempo
       {
         if (enemies[i].isAwake)
         {
@@ -726,25 +699,25 @@ void GetItem(Item item)
       break;
     case INMORTAL:
     pj_color = blanco;
-      inmortal = true;
+      inmortal = true; //El PNJ2 no puede recibir daño
       break;
     case CURE:
-      pnj2.hp = (pnj2.hp + CURE_ITEM) % HP;
+      pnj2.hp = (pnj2.hp + CURE_ITEM) % HP; // Cura al PNJ2 sin que supere el máx de HP
       break;
     case DAMAGE:
-      pnj2.hp -= DAMAGE_ITEM;
+      pnj2.hp -= DAMAGE_ITEM; // Inflige daño al PNJ2
       break;
     case VENOM:
       pj_color = morado;
-      poisoned = true;
+      poisoned = true; // va a ir dañando poco a poco al PNJ2
       break;
     default:
   }
 }
 
-void ItemCheck()
+void ItemCheck() // Retira los efectos de aquellos items cuyo timer haya terminado
 {
-  boolean free_of_effects = true;
+  boolean free_of_effects = true; // Para ver si no le afecta ningun efecto
   for (int i = 0; i < items_num; i++)
   {
     if (items[i].isTaken)
@@ -775,21 +748,19 @@ void ItemCheck()
             break;
           default:
         }
-        items[i].type = Item_type.NULO;
+        items[i].type = Item_type.NULO; // el tipo del item pasa a ser NULO porque las colisiones siguen funcionando, así no infligirá ningún efecto al player
       }
       else
       {
-        free_of_effects = false;
+        free_of_effects = false; // Si se llega aquí, el pj aún está sufriendo algún efecto
       }
     }
   }
   if (free_of_effects)
   {
-    pj_color = turquesa;
+    pj_color = turquesa; // el color se devuelve al color original si está libre de efectos
   }
 }
-
-//void ResetState()
 
 // Other Functions
 
@@ -799,19 +770,19 @@ void PNJLogic()
   
   // Si la distancia entre el pj y el pnj1 es mayor a 
   // la distancia establecida en el pnj1_dist que acerque
-  if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist)
+  if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist) 
   {
     pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
     pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
   }
-  if (pnj2.isWaiting)
+  if (pnj2.isWaiting) // Aparece esperando 
   {
-    if (DistanceBetween(pnj2.pos, pj_pos) < pnj2.dist)
+    if (DistanceBetween(pnj2.pos, pj_pos) < pnj2.dist) // Cuando el pj se acerque lo suficiente al PNJ2, este comenzará a seguirle
     {
       pnj2.isWaiting = false;
     }
   }
-  else if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist)
+  else if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist) 
   {
     pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel);
     pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel);
@@ -826,62 +797,62 @@ void PNJLogic()
       {
         switch (enemies[i].type)
         {
-        case PREDATOR:
-          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2);
+        case PREDATOR: // Se dirige hacia el PNJ2
+          enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2); 
           enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2);
           break;
-        case SHY:
+        case SHY: // Se dirige hacia el PNJ2 a no ser que el pj esté cerca
         if (DistanceBetween(enemies[i].pos, pj_pos) < enemies[i].detectionDistance)
         {
           enemies[i].pos.x = MoveAway(enemies[i].pos.x ,pj_pos.x, enemies[i].vel);
           enemies[i].pos.y = MoveAway(enemies[i].pos.y ,pj_pos.y, enemies[i].vel);
         }
-        else
+        else // Si el PJ está cerca, se alega de él
         {
           enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj2.pos.x, enemies[i].vel / 2);
           enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj2.pos.y, enemies[i].vel / 2);
         }
           break;
-        case STALKER: 
+        case STALKER: // Persigue al PNJ1
           enemies[i].pos.x = MoveTowards(enemies[i].pos.x ,pnj1.pos.x, enemies[i].vel);
           enemies[i].pos.y = MoveTowards(enemies[i].pos.y ,pnj1.pos.y, enemies[i].vel);
         }
         EnemyVel(enemies[i]);
       }
 
-      if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset)
+      if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset) // Si el pj colisiona con el enemy, lo mata
       {
         enemies[i].isDead = true;
       }
-      if (DistanceBetween(pnj2.pos, enemies[i].pos) < pnj2EnemyOffset)
+      if (DistanceBetween(pnj2.pos, enemies[i].pos) < pnj2EnemyOffset) // Si el pnj2 colisiona con el enemy, recibe daño
       {
         GetDamage(pnj2, enemyDamage);
       }
-      DrawEnemies(enemies[i].pos, enemies[i].size);
+      DrawEnemies(enemies[i].pos, enemies[i].size); // Dibujamos a los enemigos
     }
   }
 }
 
-void EnemyVel(Enemy enemy)
+void EnemyVel(Enemy enemy) // Esta funcion varia la velocidad de los enemigos sutilmente
 {
-  if (!enemy.speedTimer.isStarted)
+  if (!enemy.speedTimer.isStarted) //Inicia un timer si no está iniciado
   {
     enemy.speedTimer.StartTimer(enemySpeedTime);
   }
-  if (enemy.speedTimer.CheckTimer())
+  if (enemy.speedTimer.CheckTimer()) //Cuando el timer llegue al tiempo indicado, el incremento de velocidad cambiará
   {
     enemy.speedIncrement = random(enemyMinVel, enemyMaxVel);
   }
   else
   {
-     enemy.vel += enemy.vel > enemyMaxVel ? -0.01 : enemy.vel < enemyMinVel ? 0.01 : enemy.speedIncrement;
-  } 
-}
+     enemy.vel += enemy.vel > enemyMaxVel ? -0.01 : enemy.vel < enemyMinVel ? 0.01 : enemy.speedIncrement; // si la velocidad és mayor que la velocidad maxima, 
+  }                                                                                                        // es menor que la velocidad minima, le sumamos 0,01 a la velocidad del 
+}                                                                                                          //enemy, si no, le sumamos speedIncrement(lo que hemos seteado anteriormente)
 
-void GetDamage(Pnj pnj, float damage)
+void GetDamage(Pnj pnj, float damage) // el pnj recibe daño
 {
   pnj.hp -= damage;
-  if (pnj.hp <= 0)
+  if (pnj.hp <= 0) // Si el hp es menor o igual a 0, muere.
   {
     pnj.isDead = true;
   }
