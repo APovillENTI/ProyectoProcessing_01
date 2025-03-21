@@ -12,6 +12,9 @@ static final float VENOM_DAMAGE = 0.05;
 static final float CURE_ITEM = 50;
 static final float DAMAGE_ITEM = 1;
 
+// Cuantos powerUp necesitaremos recoger para pasar a la siguiente sala
+static final int POWER_UPS_REQUIRED = 3;
+
 // Vida inicial del PNJ2
 static final float HP = 100;
 
@@ -68,7 +71,7 @@ public class Item {
     isTaken = false;
     pos = new PVector(0,0);
   }
-  
+   
   Item_type Type(int num) // Este método sirve para asignarle un efecto aleatorio al item (haciendo que num sea un numero aleatorio)
   {
     switch(num)
@@ -171,7 +174,8 @@ Pnj pnj2 = new Pnj();
 
 // Variables de Item
 Item[] items; // Contiene todos los items
-int items_num; 
+int items_num;
+int powerUpsTaken;
 
 // Variables que indican el estado actual del player
 boolean poisoned = false;
@@ -281,6 +285,14 @@ void draw()
       items[i].effectTimer.StartTimer(items[i].effectTime); // Se activa el Timer del efecto
       items[i].isTaken = true; // Marcamos como recogido
       GetItem(items[i]); // Logica de recoger el Item
+      if (items[i].powerUp)
+      {
+        powerUpsTaken ++;
+        if (powerUpsTaken >= POWER_UPS_REQUIRED)
+        {
+            actualScene = Scene.VICTORY;
+        }
+      }
     }
   }
   
@@ -297,6 +309,7 @@ void draw()
     case BOSS:
       break;
     case DEATH:
+      DeathScene();
       break;
     case VICTORY:
       break;
@@ -515,7 +528,7 @@ void InitializeWalls()
 void InitializeItems()
 {
   //El número de ítems es un número aleatorio
-  items_num = (int)random(6, 12);
+  items_num = (int)random(POWER_UPS_REQUIRED + 1, 12);
   
   //Inicializamos el array de ítems
   items = new Item[items_num];
@@ -529,7 +542,7 @@ void InitializeItems()
       items[i].pos.x = random(0, width - items_size);
       items[i].pos.y = random(0, height - items_size);
     } while (!FreeSpot(items[i].pos, i)); // Miramos que no haya un muro u otro item en el lugar en el que queremos poner el siguiente
-    if (i < 3) // los tres primeros items del array seran powerUps
+    if (i < POWER_UPS_REQUIRED) // los tres primeros items del array seran powerUps
     {
       items[i].powerUp = true;
       items[i].type = items[i].Type((int)random(0, 3)); // Elige un efecto aleatorio
@@ -596,11 +609,14 @@ void InitializeEnemies()
 
 void DrawHUD() // Dibujar el HUD
 {
-  fill(255, 0, 0);
+  fill(rojo);
   rect(10, 40, 200, 20);
-  fill(0, 255, 0);
-  float anchoBarra = max(map(pnj2.hp, 0, 100, 0, 200), 0); // Evitar valores negativos.
-  rect(10, 40, anchoBarra, 20);
+  fill(verde);
+  if (pnj2.hp > 0)
+  {
+    float anchoBarra = max(map(pnj2.hp, 0, 100, 0, 200), 0); // Evitar valores negativos.
+    rect(10, 40, anchoBarra, 20);
+  }
 }
 
 void DrawInstances() // Dibujamos las instancias
@@ -802,6 +818,7 @@ void PNJLogic()
   
   // Si la distancia entre el pj y el pnj1 es mayor a 
   // la distancia establecida en el pnj1_dist que acerque
+
   if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist) 
   {
     pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
@@ -887,5 +904,16 @@ void GetDamage(Pnj pnj, float damage) // el pnj recibe daño
   if (pnj.hp <= 0) // Si el hp es menor o igual a 0, muere.
   {
     pnj.isDead = true;
+    actualScene = Scene.DEATH;
   }
+}
+
+void DeathScene()
+{
+  fill(0);
+  textSize(50);
+  textAlign(CENTER);
+  text("YOU LOSE!", width / 2, height / 2 - 50);
+  fill(azul);
+  rect(width / 2, height / 2 + 50, 200, 50);
 }
