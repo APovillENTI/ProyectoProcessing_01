@@ -5,10 +5,10 @@ static final int SPEED_TIME = 5000;
 static final int FREEZE_TIME = 3000; 
 static final int INMORTAL_TIME = 5000;
 static final int VENOM_TIME = 10000;
-static final int INFOFENSIVE_TIME = 5000;
+static final int INOFENSIVE_TIME = 5000;
 
 // Poder de los efectos de los items
-static final float VENOM_DAMAGE = 0.01;
+static final float VENOM_DAMAGE = 0.05;
 static final float CURE_ITEM = 50;
 static final float DAMAGE_ITEM = 1;
 
@@ -177,6 +177,7 @@ int items_num;
 boolean poisoned = false;
 boolean frozen = false;
 boolean inmortal = false;
+boolean inofensive = false;
 
 float items_size = 10; 
 float speedUp = 1; // la velocidad del PJ se multiplica por este valor, el cual cambia si se obtiene un item de velocidad
@@ -268,7 +269,7 @@ void draw()
     EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = enemy_num (dejaran de spawnear más)
   }
   
-  if (WallColision(pnj2.pos, pnj2.size))
+  if (WallColision(pnj2.pos, pnj2.size) && !inmortal)
   {
       GetDamage(pnj2, WallDamage); // Si el PNJ2 colisiona con un muro, recibe daño
   }
@@ -518,6 +519,7 @@ void InitializeItems()
   
   //Inicializamos el array de ítems
   items = new Item[items_num];
+  pjItemOffset = (items_size + pj_size) / 2;
   
   for(int i = 0; i < items_num; i++)
   {
@@ -553,13 +555,13 @@ void InitializeItems()
         break;  
       case INOFENSIVE:
         items[i].effectTime = INOFENSIVE_TIME;
+        break;
       default:
         items[i].effectTime = 0;
     }
     //VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM
     println(items[i].type); // Esto hay que quitar-lo de caras al definitivo
   }
-  pjItemOffset = (items_size + pj_size) / 2;
 }
 
 void InitializeEnemies()
@@ -650,7 +652,6 @@ void DrawEnemies(PVector enemy, float size)
 {
   fill(enemy_color);
   ellipse(enemy.x, enemy.y, size, size);
-  println(enemies[0].vel);
 }
 
 // Enemy Manager:
@@ -735,8 +736,13 @@ void GetItem(Item item)
       pj_color = morado;
       poisoned = true; // va a ir dañando poco a poco al PNJ2
       break;
+    case INOFENSIVE:
+      pj_color = rosa;
+      inofensive = true;
+      println("Just got: " + item.type);
+      break;
     default:
-  }
+  }  
 }
 
 void ItemCheck() // Retira los efectos de aquellos items cuyo timer haya terminado
@@ -770,6 +776,8 @@ void ItemCheck() // Retira los efectos de aquellos items cuyo timer haya termina
           case VENOM:
             poisoned = false;
             break;
+          case INOFENSIVE:
+            inofensive = false;
           default:
         }
         items[i].type = Item_type.NULO; // el tipo del item pasa a ser NULO porque las colisiones siguen funcionando, así no infligirá ningún efecto al player
@@ -844,11 +852,11 @@ void PNJLogic()
         EnemyVel(enemies[i]);
       }
 
-      if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset) // Si el pj colisiona con el enemy, lo mata
+      if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset && !inofensive) // Si el pj colisiona con el enemy, lo mata
       {
         enemies[i].isDead = true;
       }
-      if (DistanceBetween(pnj2.pos, enemies[i].pos) < pnj2EnemyOffset) // Si el pnj2 colisiona con el enemy, recibe daño
+      if (DistanceBetween(pnj2.pos, enemies[i].pos) < pnj2EnemyOffset && !inmortal) // Si el pnj2 colisiona con el enemy, recibe daño
       {
         GetDamage(pnj2, enemyDamage);
       }
