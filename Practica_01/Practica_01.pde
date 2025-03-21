@@ -5,6 +5,7 @@ static final int SPEED_TIME = 5000;
 static final int FREEZE_TIME = 3000; 
 static final int INMORTAL_TIME = 5000;
 static final int VENOM_TIME = 10000;
+static final int INFOFENSIVE_TIME = 5000;
 
 // Poder de los efectos de los items
 static final float VENOM_DAMAGE = 0.01;
@@ -24,6 +25,7 @@ color naranja = color(250, 150, 0); // Para el PNJ1
 color azul = color(0, 0, 250); // Para el PNJ2
 color blanco = color(255, 255, 255); // Para la inmortalidad
 color turquesa = color(0, 250, 160); // Para el PJ
+color rosa = color(255, 160, 200); // Para el efecto inofensivo
 
 //Variables de muros
 PVector[] muros; // Contiene todos los muros
@@ -42,12 +44,15 @@ float alfa = 0.1;
 boolean using_mouse = false; // Para cambiar de modo WASD a modo Mouse (falta por ajustar)
 
 //Enum del Item
-public enum Item_type {VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM, NULO};
-int type_num = 6; // Es el numero total de efectos de los items(sin contar el NULO) para randomizarlos
+public enum Item_type {VEL, FREEZE, INMORTAL, CURE, DAMAGE, VENOM, INOFENSIVE, NULO};
+int type_num = 7; // Es el numero total de efectos de los items(sin contar el NULO) para randomizarlos
 //Enum del Enemy
 public enum Enemy_type {SHY, STALKER, PREDATOR}; // SHY: Se acerca al PNJ2 pero huye del PJ
                                                  // STALKER: Se acerca al PNJ1
                                                  // PREDATOR: Ataca al PNJ2
+                                               
+public enum Scene {MENU, LEVEL1, BOSS, DEATH, VICTORY}; // En qué escena nos encontramos                        
+Scene actualScene;
 
 public class Item {
   boolean powerUp; // Decide si el item es un powerUp o powerDown (Se tiene que usar para la logica de recoger los powerUps para pasar a la siguiente sala
@@ -80,6 +85,8 @@ public class Item {
         return Item_type.DAMAGE; 
       case 5:
         return Item_type.VENOM;
+      case 6:
+        return Item_type.INOFENSIVE;
       default:
         return Item_type.NULO;
     }
@@ -200,6 +207,7 @@ int N = 10; // Numero que debe decidir el jugador y se relaciona con el numero t
 
 void setup() {
   // Creamos la ventana
+  actualScene = Scene.LEVEL1;
   size(600, 600);
   
   enemy_num = N;
@@ -250,7 +258,12 @@ void draw()
   
   PNJLogic(); 
   
-  if (enemy_counter < enemy_num)
+  switch (actualScene)
+  {
+    case MENU:
+      break;
+    case LEVEL1:
+      if (enemy_counter < enemy_num)
   {
     EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = enemy_num (dejaran de spawnear más)
   }
@@ -279,6 +292,15 @@ void draw()
   
   DrawInstances(); // Dibujamos las instancias
   DrawHUD(); // Dibujamos el HUD
+      break;
+    case BOSS:
+      break;
+    case DEATH:
+      break;
+    case VICTORY:
+      break;
+    default:
+  }
 }
 
 // EVENTS
@@ -529,6 +551,8 @@ void InitializeItems()
       case VENOM:
         items[i].effectTime = VENOM_TIME;
         break;  
+      case INOFENSIVE:
+        items[i].effectTime = INOFENSIVE_TIME;
       default:
         items[i].effectTime = 0;
     }
