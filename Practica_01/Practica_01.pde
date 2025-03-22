@@ -15,14 +15,27 @@ static final float DAMAGE_ITEM = 1;
 // Cuantos powerUp necesitaremos recoger para pasar a la siguiente sala
 static final int POWER_UPS_REQUIRED = 3;
 
+// Iniciales del PJ
+static final float PJ_VELOCIDAD = 3; 
+static final float PJ_SIZE = 20;
+
 // Vida inicial del PNJ2
 static final float HP = 100;
+
+// MAX MIN enemigos
+static final int MIN_ENEMIES = 5;
+static final int MAX_ENEMIES = 50;
+
+// MINUS PLUS BUTTONS SIZE
+static final int MP_SIZE = 40;
 
 //Colores
 color morado = color(150, 0, 180); // Para el veneno
 color rojo = color(200, 0, 0); // Para los enemigos
+color rojo_claro = color (255, 50, 50); // Para el boton quit 
 color cian = color(165, 244, 255); // Para los enemigos congelados (Frozen)
 color verde = color(0, 205, 0); // Para los items
+color verde_claro = color(50, 255, 50); // Para el boton restart
 color amarillo = color(250, 250, 0); // Para el efecto de velociad
 color naranja = color(250, 150, 0); // Para el PNJ1
 color azul = color(0, 0, 250); // Para el PNJ2
@@ -37,10 +50,10 @@ float WallDamage = 0.5; // Daño que inflingen los muros al colisionar con el PN
 int muros_num; // Numero max de muros
 
 //Variables de Jugador
-float pj_vel = 3; 
-float pj_size = 20;
+float pj_vel; 
+float pj_size;
 PVector pj_pos;
-color pj_color = turquesa;
+color pj_color;
 
 float alfa = 0.1;
 
@@ -56,6 +69,33 @@ public enum Enemy_type {SHY, STALKER, PREDATOR}; // SHY: Se acerca al PNJ2 pero 
                                                
 public enum Scene {MENU, LEVEL1, BOSS, DEATH, VICTORY}; // En qué escena nos encontramos                        
 Scene actualScene;
+
+public class Button {
+  
+  PVector pos;
+  float ancho, alto;
+  Scene sceneToGo;
+  color c_base;
+  color c_over;
+  
+  Button()
+  {
+    pos = new PVector(0,0);
+    sceneToGo = Scene.MENU;
+  }
+  
+  boolean IsOver()
+  {
+    if (mouseX < pos.x - ancho / 2 || mouseY < pos.y - alto / 2 || mouseX > pos.x + ancho / 2 || mouseY > pos.y + alto / 2) 
+    {
+      return false;
+    }
+    else
+    {
+      return true;
+    }
+  }
+}
 
 public class Item {
   boolean powerUp; // Decide si el item es un powerUp o powerDown (Se tiene que usar para la logica de recoger los powerUps para pasar a la siguiente sala
@@ -97,8 +137,8 @@ public class Item {
 }
 
 public class Pnj {
-  boolean isDead;
-  boolean isWaiting; // Cuando spawnea, el PNJ2 permanece inmovil, este booleano activa o desactiva este estado
+  boolean isWaiting; // Cuando spawnea, el PNJ2 permanece inmovil, este booleano activa o desactiva este estado 
+                     // Ya que el PNJ1 no espera, lo vamos a utilizar para saber cuando el PNJ va a tener que huir de un enemigo o no
     float vel;
     float size;
     float dist; // distancia respecto al PJ que tendrá el PNJ
@@ -108,9 +148,8 @@ public class Pnj {
     
    Pnj() //Constructor de la clase PNJ
    {
-     isDead = false;
      isWaiting = true;
-     pos = new PVector(random(0,width), random (0, height)); // la posición es aleatoria (revisarlo porque no funciona correctamente(siempre aparece en la esquina izqda))
+     pos = new PVector(0, 0); // la posición es aleatoria
    }
 }
 
@@ -189,7 +228,7 @@ color item_color = verde;
 
 // Variables de Enemy
 Enemy[] enemies; // Contiene todos los enemigos
-int enemy_num; // Total de enemigos
+int N = MIN_ENEMIES; // Total de enemigos
 int enemy_counter = 0; // Cuenta los enemigos spawneados
 
 float enemySpawnTime = 5000; // Tiempo que tardan los enemigos en spawnear
@@ -206,31 +245,32 @@ float pjItemOffset;
 color enemy_color = rojo;
 Timer enemyTimer; // Se utiliza para paulatinar el spawn de enemigos
 
-int N = 10; // Numero que debe decidir el jugador y se relaciona con el numero total de enemigos
+// Manager numero de enemigos
+PVector label_pos;
+float ancho_label = 100;
+
+// Variables de los botones
+Button playButton;
+Button mQuitButton;
+Button restartButton;
+Button quitButton;
+Button N_plus;
+Button N_minus;
+
+// Guardamos la mitad de la pantalla w = witdh, h = height
+float w_half; 
+float h_half;
 
 //  SETUP
 
 void setup() {
   // Creamos la ventana
-  actualScene = Scene.LEVEL1;
+  actualScene = Scene.MENU;
   size(600, 600);
+  w_half = width / 2;
+  h_half = height / 2;
   
-  enemy_num = N;
-  
-  //Inicializamos las variables de los PNJ
-  InitializePNJs(); 
-  
-  // Inicializamos los muros
-  InitializeWalls();
-  
-  //Inicializamos los ítems
-  InitializeItems();
-  
-  // Inicializamos los enemigos
-  InitializeEnemies();
-  
-  // Inicializamos la posicion del jugador en medio de la ventana
-  pj_pos = new PVector(width / 2.0, height / 2.0);
+  InitializeScene();
 }
 
 //  DRAW
@@ -238,73 +278,75 @@ void setup() {
 void draw()
 {
   background(255);
-  // KEY PRESSED
   
-  //Movimiento del PJ (WASD)
-  if (keyPressed) {
-    if ((key == 'w' || key == 'W')) { // && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
-      pj_pos.y -= pj_vel * speedUp; // SpeedUp es 1 normalmente, cuando se recoge un item de velocidad se duplica
-    }
-    else if ((key == 'd' || key == 'D')) { // && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
-      pj_pos.x += pj_vel * speedUp;
-    }
-    else if ((key == 'a' || key == 'A')) { // && Borders(2, pj_pos, pj_vel) && !WallBorder(2, pj_pos)) {
-      pj_pos.x -= pj_vel * speedUp;
-    }
-    else if ((key == 's' || key == 'S')) { // && Borders(1, pj_pos, pj_vel) && !WallBorder(1, pj_pos)) {
-      pj_pos.y += pj_vel * speedUp;
-    }
-  }
-  if (using_mouse)
-  {
-    pj_pos.y = mouseY;
-    pj_pos.x = mouseX;
-  }
-  
-  PNJLogic(); 
-  
-  switch (actualScene)
+  switch (actualScene) //<>//
   {
     case MENU:
+      MainMenu();
       break;
     case LEVEL1:
-      if (enemy_counter < enemy_num)
-  {
-    EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = enemy_num (dejaran de spawnear más)
-  }
-  
-  if (WallColision(pnj2.pos, pnj2.size) && !inmortal)
-  {
-      GetDamage(pnj2, WallDamage); // Si el PNJ2 colisiona con un muro, recibe daño
-  }
-  
-  for (int i = 0; i < items_num; i++)
-  {
-    if (!items[i].isTaken && DistanceBetween(items[i].pos, pj_pos) < pjItemOffset) // Detectamos si el player colisiona con un item que no haya sido recogido aún
-    {
-      items[i].effectTimer.StartTimer(items[i].effectTime); // Se activa el Timer del efecto
-      items[i].isTaken = true; // Marcamos como recogido
-      GetItem(items[i]); // Logica de recoger el Item
-      if (items[i].powerUp)
-      {
-        powerUpsTaken ++;
-        if (powerUpsTaken >= POWER_UPS_REQUIRED)
-        {
-            actualScene = Scene.VICTORY;
+    
+         //Movimiento del PJ (WASD)
+      if (keyPressed) {
+        if ((key == 'w' || key == 'W')) { // && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
+          pj_pos.y -= pj_vel * speedUp; // SpeedUp es 1 normalmente, cuando se recoge un item de velocidad se duplica
+        }
+        else if ((key == 'd' || key == 'D')) { // && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
+          pj_pos.x += pj_vel * speedUp;
+        }
+        else if ((key == 'a' || key == 'A')) { // && Borders(2, pj_pos, pj_vel) && !WallBorder(2, pj_pos)) {
+          pj_pos.x -= pj_vel * speedUp;
+        }
+        else if ((key == 's' || key == 'S')) { // && Borders(1, pj_pos, pj_vel) && !WallBorder(1, pj_pos)) {
+          pj_pos.y += pj_vel * speedUp;
         }
       }
-    }
-  }
-  
-  ItemCheck(); // Chequeamos si los efectos de los items siguen haciendo efecto
-  
-  if (poisoned)
-  {
-    pnj2.hp -= VENOM_DAMAGE; // El item de veneno daña al PNJ2
-  }
-  
-  DrawInstances(); // Dibujamos las instancias
-  DrawHUD(); // Dibujamos el HUD
+      if (using_mouse)
+      {
+        pj_pos.y = mouseY;
+        pj_pos.x = mouseX;
+      }
+      
+      PNJLogic(); 
+          if (enemy_counter < N)
+      {
+        EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = N(dejaran de spawnear más)
+      }
+      
+      if (WallColision(pnj2.pos, pnj2.size) && !inmortal)
+      {
+          GetDamage(pnj2, WallDamage); // Si el PNJ2 colisiona con un muro, recibe daño
+      }
+      
+      for (int i = 0; i < items_num; i++)
+      {
+        if (!items[i].isTaken && DistanceBetween(items[i].pos, pj_pos) < pjItemOffset) // Detectamos si el player colisiona con un item que no haya sido recogido aún
+        {
+          items[i].effectTimer.StartTimer(items[i].effectTime); // Se activa el Timer del efecto
+          items[i].isTaken = true; // Marcamos como recogido
+          GetItem(items[i]); // Logica de recoger el Item
+          if (items[i].powerUp)
+          {
+            powerUpsTaken ++;
+            if (powerUpsTaken >= POWER_UPS_REQUIRED)
+            {
+                actualScene = Scene.VICTORY;
+                InitializeScene();
+            }
+          }
+        }
+      }
+      
+      ItemCheck(); // Chequeamos si los efectos de los items siguen haciendo efecto
+      
+      if (poisoned)
+      {
+        pnj2.hp -= VENOM_DAMAGE; // El item de veneno daña al PNJ2
+      }
+      
+      DrawInstances(); // Dibujamos las instancias
+      DrawHUD(); // Dibujamos el HUD
+      
       break;
     case BOSS:
       break;
@@ -312,6 +354,7 @@ void draw()
       DeathScene();
       break;
     case VICTORY:
+      VictoryScene();
       break;
     default:
   }
@@ -344,6 +387,57 @@ float MoveAway(float thisPoint, float finalPoint, float speed) // da la direcci�
 {
   float move = (1.0 + speed * alfa) * thisPoint - speed * alfa * finalPoint;
   return move;
+}
+
+void mouseClicked()
+{
+  switch(actualScene)
+  {
+    case MENU:
+      if (N_plus.IsOver() && N < MAX_ENEMIES)
+      {
+        N++;
+      }
+      if (N_minus.IsOver() && N > MIN_ENEMIES)
+      {
+        N--;
+      }
+      if (playButton.IsOver())
+      {
+        actualScene = playButton.sceneToGo;
+        InitializeScene();
+      }
+      if (mQuitButton.IsOver())
+      {
+        exit();
+      }
+      break;
+    case DEATH:
+      if (restartButton.IsOver())
+      {
+        actualScene = restartButton.sceneToGo;
+        InitializeScene();
+      }
+      if (quitButton.IsOver())
+      {
+        actualScene = quitButton.sceneToGo;
+        InitializeScene();
+      }
+      break;
+    case VICTORY:
+        if (restartButton.IsOver())
+      {
+        actualScene = restartButton.sceneToGo;
+        InitializeScene();
+      }
+      if (quitButton.IsOver())
+      {
+        actualScene = quitButton.sceneToGo;
+        InitializeScene();
+      }
+      break;
+    default:
+  }
 }
 
 //  BOOLEAN FUNCTIONS
@@ -448,7 +542,7 @@ Boolean WallColision(PVector p, float size) // Colision entre un PVector p y su 
       max_muro.x = muros[i].x + ancho_muro; 
       max_muro.y = muros[i].y + alto_muro;
 
-      if (p_max_x < max_muro.x - ancho_muro || p_max_y < max_muro.y - alto_muro || max_muro.x < p_min_x || max_muro.y < p_min_y) //Buscamos si NO colisiona
+      if (p_max_x <= max_muro.x - ancho_muro || p_max_y <= max_muro.y - alto_muro || max_muro.x <= p_min_x || max_muro.y <= p_min_y) //Buscamos si NO colisiona
       {
         continue;
       }
@@ -475,7 +569,7 @@ Boolean WallColision(PVector p, int index) // Colision entre dos muros (para ini
     max_muro.x = muros[i].x + ancho_muro;
     max_muro.y = muros[i].y + alto_muro;
      
-    if (p_max_x < max_muro.x - ancho_muro || p_max_y < max_muro.y - alto_muro || max_muro.x < p_min_x || max_muro.y < p_min_y) 
+    if (p_max_x <= max_muro.x - ancho_muro || p_max_y <= max_muro.y - alto_muro || max_muro.x <= p_min_x || max_muro.y <= p_min_y) 
     {
       continue;
     }
@@ -490,7 +584,46 @@ Boolean WallColision(PVector p, int index) // Colision entre dos muros (para ini
 // FUNCTIONS
 
 //Initializing functions:
-void InitializePNJs()
+void InitializeScene() //<>//
+{
+  switch(actualScene)
+  {
+    case MENU:
+      InitializeButtons();
+      break;
+    case LEVEL1:
+      InitializePJ();
+      InitializeWalls();
+      InitializePNJs();
+      InitializeItems();
+      InitializeEnemies();   
+      break;
+    case BOSS:
+      break;
+    case DEATH:
+      InitializeButtons();
+      break;
+    case VICTORY:
+      InitializeButtons();
+      break;
+    default:
+  }
+}
+
+void InitializePJ()
+{
+  pj_vel = PJ_VELOCIDAD; 
+  pj_size = PJ_SIZE;
+  pj_color = turquesa;
+  poisoned = false;
+  frozen = false;
+  inmortal = false;
+  inofensive = false;
+  speedUp = 1; 
+  pj_pos = new PVector(w_half, h_half);
+}
+
+void InitializePNJs() //<>//
 {
   pnj1.vel = 0.1;
   pnj1.size = 20.0;
@@ -502,9 +635,14 @@ void InitializePNJs()
   pnj2.hp = HP;
   pnj2.isWaiting = true;
   pnj2.tint = azul;
+  pnj1.pos = new PVector(random(pnj1.size, width - pnj1.size), random (pnj1.size, height - pnj1.size));
+  do
+  {
+    pnj2.pos = new PVector(random(pnj2.size, width - pnj2.size), random (pnj2.size, height - pnj2.size));
+  } while (WallColision(pnj2.pos, pnj2.size + 1));
 }
 
-void InitializeWalls()
+void InitializeWalls() //<>//
 {
   // El número de muros es un número aleatorio entre 6 y 20
   muros_num = (int)random(6, 20);
@@ -522,17 +660,18 @@ void InitializeWalls()
     muros[i].y = random(0, height - alto_muro); // Coord Y punto inferior izquierdo
     } while (WallColision(muros[i], i) && (muros[i].x > width/2 + ancho_muro || muros[i].x < width/2 - ancho_muro) && (muros[i].y < height/2 - alto_muro || muros[i].y > height/ 2 + alto_muro));
     // Miramos que en la posicion en la que queremos crear el muro no hay ningun muro y que no esté en el centro, que es donde aparece el pj
-}
+  }
 }
 
-void InitializeItems()
+void InitializeItems() //<>//
 {
   //El número de ítems es un número aleatorio
-  items_num = (int)random(POWER_UPS_REQUIRED + 1, 12);
+  items_num = (int)random(POWER_UPS_REQUIRED + 3, 12);
   
   //Inicializamos el array de ítems
   items = new Item[items_num];
   pjItemOffset = (items_size + pj_size) / 2;
+  powerUpsTaken = 0;
   
   for(int i = 0; i < items_num; i++)
   {
@@ -577,21 +716,21 @@ void InitializeItems()
   }
 }
 
-void InitializeEnemies()
+void InitializeEnemies() //<>//
 {
   // Inicializamos el array
-  enemies = new Enemy[enemy_num];
+  enemies = new Enemy[N];
   enemyTimer = new Timer();
   
   // Seteamos los tipos de los enemies
-  for (int i = 0; i < enemy_num; i++)
+  for (int i = 0; i < N; i++)
   {
     enemies[i] = new Enemy();
-    if (i < enemy_num / 4) // Un 25% irá a por el pnj2
+    if (i < N / 4) // Un 25% irá a por el pnj2
     {
       enemies[i].type = Enemy_type.PREDATOR; 
     }
-    else if (i < enemy_num / 2) // Otro 25% irá a por el pnj1
+    else if (i < N / 2) // Otro 25% irá a por el pnj1
     {
       enemies[i].type = Enemy_type.STALKER;
     }
@@ -603,6 +742,7 @@ void InitializeEnemies()
   }
   pjEnemyOffset = pj_size / 2 + enemies[0].size;
   pnj2EnemyOffset = pnj2.size / 2 + enemies[0].size;
+  enemy_counter = 0;
 }
 
 // Draw functions:
@@ -637,11 +777,8 @@ void DrawInstances() // Dibujamos las instancias
     fill(pnj1.tint);
     ellipse(pnj1.pos.x, pnj1.pos.y, pnj1.size, pnj1.size);
 
-    if (!pnj2.isDead)
-    {
-      fill(pnj2.tint);
-      ellipse(pnj2.pos.x, pnj2.pos.y, pnj2.size, pnj2.size);
-    }
+    fill(pnj2.tint);
+    ellipse(pnj2.pos.x, pnj2.pos.y, pnj2.size, pnj2.size);
     
     //DIBUJAR MUROS:
     
@@ -674,11 +811,9 @@ void DrawEnemies(PVector enemy, float size)
 
 void EnemySpawn()
 {
-  if (!enemyTimer.isStarted) // Si el tiempo no está iniciado
-  {
-    enemyTimer.StartTimer(enemySpawnTime); // Inicia el timer
-  }
-  if (enemyTimer.CheckTimer()) // Chequea si el timer ha terminado (devuelve true/false)
+  enemyTimer.StartTimer(enemySpawnTime); // Inicia el timer
+
+  if (enemyTimer.CheckTimer() && !frozen) // Chequea si el timer ha terminado (devuelve true/false)
   {
     GenerateEnemy(); // Genera enemigo
   }
@@ -688,7 +823,7 @@ void GenerateEnemy() {
   int enemyId;
   do 
   {
-    enemyId = (int)random(0, enemy_num); // Generamos un index del array aleatorio, para que se cree un enemigo aleatorio de todo el array de enemigos
+    enemyId = (int)random(0, N); // Generamos un index del array aleatorio, para que se cree un enemigo aleatorio de todo el array de enemigos
   } while(enemies[enemyId].isAwake || enemies[enemyId].isDead); // Nos aseguramos que el enemigo no esté ya spawneado y que tampoco esté muerto
   
   int spawn = int(random(4)); // Aparece en uno de los cuatro lados de manera aleatoria.
@@ -711,9 +846,12 @@ void GenerateEnemy() {
       break;
      default:
   }  
-  enemyTimer.StartTimer(enemySpawnTime); // Iniciamos el timer del siguiente Spawn
   enemies[enemyId].isAwake = true; 
-  enemy_counter++; // Contador suma para que cuando llegue a enemy_num no spawneen más enemigos
+  enemy_counter++; // Contador suma para que cuando llegue a N no spawneen más enemigos
+  if (enemy_counter < N)
+  {
+    enemyTimer.StartTimer(enemySpawnTime); // Iniciamos el timer del siguiente Spawn
+  }
 }
 
 // Items logic
@@ -729,7 +867,7 @@ void GetItem(Item item)
       break;
     case FREEZE:
       enemy_color = cian;
-      for (int i = 0; i < enemy_num; i++) // Detiene a los enemigos durante un tiempo
+      for (int i = 0; i < N; i++) // Detiene a los enemigos durante un tiempo
       {
         if (enemies[i].isAwake)
         {
@@ -776,7 +914,7 @@ void ItemCheck() // Retira los efectos de aquellos items cuyo timer haya termina
             speedUp = 1;
             break;
           case FREEZE:
-            for (int j = 0; j < enemy_num; j++)
+            for (int j = 0; j < N; j++)
             {
               if (enemies[j].isAwake)
               {
@@ -812,18 +950,49 @@ void ItemCheck() // Retira los efectos de aquellos items cuyo timer haya termina
 
 // Other Functions
 
+int NearEnemy() // Devuelve el index del array de enemigos que indica el enemigo que más cerca se encuentre del PNJ1
+{
+  int index = 0; // El indice empieza siendo 0
+  for (int i = 0; i < N; i++)
+  {  
+    if (DistanceBetween(enemies[i].pos, pnj1.pos) < pnj1.dist * 2)
+    {
+        index = DistanceBetween(enemies[i].pos, pnj1.pos) < DistanceBetween(enemies[index].pos, pnj1.pos) ? i : index; 
+        // Si la distancia del enemigo que estamos revisando es menor a la del último enemigo más cercano revisado guardamos su índice
+    }
+  }
+  return index;
+}
+
 void PNJLogic()
 {
-   // good PNJ movement:
-  
-  // Si la distancia entre el pj y el pnj1 es mayor a 
-  // la distancia establecida en el pnj1_dist que acerque
-
-  if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist) 
-  {
-    pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
-    pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
+  for (int i = 0; i < N; i++)
+  {  
+    // como el pnj1 nunca va a esperar a que lo recojamos, la variable isWaiting de la clase pnj nunca se usa, así que le daremos un nuevo uso
+    pnj1.isWaiting = DistanceBetween(enemies[i].pos, pnj1.pos) > pnj1.dist * 2 ? true : !enemies[i].isAwake ? true : enemies[i].isDead ? true : false;
+    // Si la distancia entre el enemigo y el pnj1 es mayor al doble de la distancia indicada en dist, isWaiting será true
+    // en caso contrario, si el enemigo no está despierto (aun no se ha creado) isWaiting será true, en caso contrario, 
+    // si el enemigo está muerto, isWaiting será true, y en caso contrario, isWaiting será false    
   }
+  // good PNJ movement:
+  
+  // Si no detectamos ningun enemigo vivo cerca del pnj1:
+  if (pnj1.isWaiting) 
+  {
+    // Si la distancia entre el pj y el pnj1 es mayor a 
+    // la distancia establecida en el pnj1_dist que se acerque
+    if (DistanceBetween(pnj1.pos, pj_pos) > pnj1.dist) 
+    {
+      pnj1.pos.x = MoveTowards(pnj1.pos.x, pj_pos.x, pnj1.vel);
+      pnj1.pos.y = MoveTowards(pnj1.pos.y, pj_pos.y, pnj1.vel);
+    }
+  }
+  else // Si no, se moverá en dirección contraria a la que se encuentre el enemigo más cercano a este
+  {
+    pnj1.pos.x = MoveAway(pnj1.pos.x, enemies[NearEnemy()].pos.x, pnj1.vel * 2);  
+    pnj1.pos.y = MoveAway(pnj1.pos.y, enemies[NearEnemy()].pos.y, pnj1.vel * 2);
+  }
+  
   if (pnj2.isWaiting) // Aparece esperando 
   {
     if (DistanceBetween(pnj2.pos, pj_pos) < pnj2.dist) // Cuando el pj se acerque lo suficiente al PNJ2, este comenzará a seguirle
@@ -831,14 +1000,22 @@ void PNJLogic()
       pnj2.isWaiting = false;
     }
   }
+  // Si la distancia entre el pj y el pnj2 es mayor a 
+  // la distancia establecida en el pnj2.dist que se acerque
   else if (DistanceBetween(pnj2.pos, pj_pos) > pnj2.dist) 
   {
     pnj2.pos.x = MoveTowards(pnj2.pos.x, pj_pos.x, pnj2.vel);
     pnj2.pos.y = MoveTowards(pnj2.pos.y, pj_pos.y, pnj2.vel);
   }
-
+  
+  if (pnj2.hp <= 0) // Si el hp es menor o igual a 0, muere.
+  {
+    actualScene = Scene.DEATH;
+    InitializeScene();
+  }
+  
   // Enemies movement
-  for (int i = 0; i < enemy_num; i++)
+  for (int i = 0; i < N; i++)
   {
     if (enemies[i].isAwake && !enemies[i].isDead)
     {
@@ -901,11 +1078,101 @@ void EnemyVel(Enemy enemy) // Esta funcion varia la velocidad de los enemigos su
 void GetDamage(Pnj pnj, float damage) // el pnj recibe daño
 {
   pnj.hp -= damage;
-  if (pnj.hp <= 0) // Si el hp es menor o igual a 0, muere.
-  {
-    pnj.isDead = true;
-    actualScene = Scene.DEATH;
+}
+
+void InitializeButtons()
+{
+  if (actualScene == Scene.MENU)
+  {    
+    label_pos = new PVector(w_half, h_half - MP_SIZE / 2);
+    N_plus = new Button();
+    N_minus = new Button();
+    playButton = new Button();
+    mQuitButton = new Button();
+    
+    N_plus.ancho = MP_SIZE;
+    N_plus.alto = MP_SIZE;
+    N_plus.pos = new PVector(label_pos.x + ancho_label / 2, label_pos.y);
+    
+    N_minus.ancho = MP_SIZE;
+    N_minus.alto = MP_SIZE;
+    N_minus.pos = new PVector(label_pos.x - ancho_label / 2, label_pos.y);
+    
+    playButton.ancho = 200;
+    playButton.alto = 75;
+    playButton.pos = new PVector(w_half, h_half + 80);
+  
+    mQuitButton.ancho = 175;
+    mQuitButton.alto = 50;
+    mQuitButton.pos = new PVector(w_half, h_half + 160);
+    
+    playButton.c_base = verde;
+    playButton.c_over = verde_claro;
+    mQuitButton.c_base = rojo;
+    mQuitButton.c_over = rojo_claro;
+    N_plus.c_base = verde;
+    N_plus.c_over = verde_claro;
+    N_minus.c_base = rojo;
+    N_minus.c_over = rojo_claro;
+    
+    playButton.sceneToGo = Scene.LEVEL1;
   }
+  else
+  {
+    restartButton = new Button();
+    quitButton = new Button();
+  
+    restartButton.ancho = 200;
+    restartButton.alto = 75;
+    restartButton.pos = new PVector(w_half, h_half + 70);
+  
+    quitButton.ancho = 175;
+    quitButton.alto = 50;
+    quitButton.pos = new PVector(w_half, h_half + 150);
+    
+    restartButton.c_base = verde;
+    restartButton.c_over = verde_claro;
+    quitButton.c_base = rojo;
+    quitButton.c_over = rojo_claro;
+    
+    restartButton.sceneToGo = Scene.LEVEL1;
+    quitButton.sceneToGo = Scene.MENU;
+  }
+}
+
+void DrawButtons()
+{
+  // restart Button
+  if (restartButton.IsOver())
+  {
+    fill(restartButton.c_over);
+  }
+  else
+  {
+    fill(restartButton.c_base);
+  }
+  rectMode(CENTER);
+  rect(restartButton.pos.x, restartButton.pos.y, restartButton.ancho, restartButton.alto);
+  fill(0);
+  textSize(40);
+  textAlign(CENTER, CENTER);
+  text("RESTART", restartButton.pos.x, restartButton.pos.y);
+  
+  // quit Button
+    if (quitButton.IsOver())
+  {
+    fill(quitButton.c_over);
+  }
+  else
+  {
+    fill(quitButton.c_base);
+  }
+  rectMode(CENTER);
+  rect(quitButton.pos.x, quitButton.pos.y, quitButton.ancho, quitButton.alto);
+  fill(0);
+  textSize(30);
+  textAlign(CENTER, CENTER);
+  text("QUIT", quitButton.pos.x, quitButton.pos.y);
 }
 
 void DeathScene()
@@ -913,7 +1180,94 @@ void DeathScene()
   fill(0);
   textSize(50);
   textAlign(CENTER);
-  text("YOU LOSE!", width / 2, height / 2 - 50);
-  fill(azul);
-  rect(width / 2, height / 2 + 50, 200, 50);
+  text("YOU LOSE!", w_half, h_half - 50);
+  DrawButtons();
+}
+
+void VictoryScene()
+{
+  fill(0);
+  textSize(50);
+  textAlign(CENTER);
+  text("YOU WIN!", w_half, h_half - 50);
+  DrawButtons();
+}
+
+void MainMenu()
+{
+  // Draw Rectangles
+  rectMode(CENTER);
+  fill(200);
+  rect(label_pos.x, label_pos.y, MP_SIZE + 10, MP_SIZE + 10);
+  if (N < MAX_ENEMIES)
+  {
+    if (N_plus.IsOver())
+    {
+      fill(N_plus.c_over);
+    }
+    else
+    {
+      fill(N_plus.c_base);
+    }
+    rect(N_plus.pos.x, N_plus.pos.y, N_plus.ancho, N_plus.alto);
+    fill(0);
+    textSize(50); 
+    textAlign(CENTER, CENTER);
+    text("+", label_pos.x + MP_SIZE * 1.25, label_pos.y);  
+  }
+  if(N > MIN_ENEMIES)
+  {
+      if (N_minus.IsOver())
+    {
+      fill(N_minus.c_over);
+    }
+    else
+    {
+      fill(N_minus.c_base);
+    }
+    rect(N_minus.pos.x, N_minus.pos.y, N_minus.ancho, N_minus.alto);
+    fill(0);
+    textSize(50); 
+    textAlign(CENTER, CENTER);
+    text("-", label_pos.x - MP_SIZE * 1.2, label_pos.y - 5);   
+  }
+  
+  // Draw Text
+  fill(0);
+  textSize(30);
+  text(N, label_pos.x, label_pos.y);
+  textSize(50);
+  textAlign(CENTER, CENTER);
+  text("PURSUIT OF HAPPINESS", w_half, h_half - 100);
+  
+  // play Button
+  if (playButton.IsOver())
+  {
+    fill(playButton.c_over);
+  }
+  else
+  {
+    fill(playButton.c_base);
+  }
+  rect(playButton.pos.x, playButton.pos.y, playButton.ancho, playButton.alto);
+  fill(0);
+  textSize(40);
+  textAlign(CENTER, CENTER);
+  text("PLAY", playButton.pos.x, playButton.pos.y);
+  
+  // quit Button
+    if (mQuitButton.IsOver())
+  {
+    fill(mQuitButton.c_over);
+  }
+  else
+  {
+    fill(mQuitButton.c_base);
+  }
+  rectMode(CENTER);
+  rect(mQuitButton.pos.x, mQuitButton.pos.y, mQuitButton.ancho, mQuitButton.alto);
+  fill(0);
+  textSize(30);
+  textAlign(CENTER, CENTER);
+  text("QUIT", mQuitButton.pos.x, mQuitButton.pos.y);
 }
