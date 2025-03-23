@@ -24,7 +24,7 @@ static final float HP = 100;
 
 // MAX MIN enemigos
 static final int MIN_ENEMIES = 5;
-static final int MAX_ENEMIES = 50;
+static final int MAX_ENEMIES = 20;
 
 // MINUS PLUS BUTTONS SIZE
 static final int MP_SIZE = 40;
@@ -1239,6 +1239,8 @@ void MainMenu()
   textSize(50);
   textAlign(CENTER, CENTER);
   text("PURSUIT OF HAPPINESS", w_half, h_half - 100);
+  textSize(15);
+  text("Nº ENEMIES", w_half, h_half - 55);
   
   // play Button
   if (playButton.IsOver())
