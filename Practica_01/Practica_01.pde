@@ -70,13 +70,13 @@ public enum Enemy_type {SHY, STALKER, PREDATOR}; // SHY: Se acerca al PNJ2 pero 
 public enum Scene {MENU, LEVEL1, BOSS, DEATH, VICTORY}; // En qué escena nos encontramos                        
 Scene actualScene;
 
-public class Button {
+public class Button { // Clase Boton
   
-  PVector pos;
-  float ancho, alto;
-  Scene sceneToGo;
-  color c_base;
-  color c_over;
+  PVector pos; // Posición del botón
+  float ancho, alto; // Tamaño del botón
+  Scene sceneToGo; // Escena a la que nos llevará
+  color c_base; // Color base del botón
+  color c_over; // Color cuando el ratón esté sobre el botón
   
   Button()
   {
@@ -84,6 +84,7 @@ public class Button {
     sceneToGo = Scene.MENU;
   }
   
+  // Metodo para detectar si el ratón está sobre el botón
   boolean IsOver()
   {
     if (mouseX < pos.x - ancho / 2 || mouseY < pos.y - alto / 2 || mouseX > pos.x + ancho / 2 || mouseY > pos.y + alto / 2) 
@@ -249,8 +250,8 @@ Timer enemyTimer; // Se utiliza para paulatinar el spawn de enemigos
 PVector label_pos;
 float ancho_label = 100;
 
-// Variables de los botones
-Button playButton;
+// Instancias de los botones
+Button playButton; 
 Button mQuitButton;
 Button restartButton;
 Button quitButton;
@@ -265,39 +266,43 @@ float h_half;
 
 void setup() {
   // Creamos la ventana
-  actualScene = Scene.MENU;
+  
   size(600, 600);
+  
+  // Como calculamos muchas veces la mitad de la pantalla, tanto en lo alto, como lo ancho, guardamos estos valores al iniciar el programa
   w_half = width / 2;
   h_half = height / 2;
   
-  InitializeScene();
+  actualScene = Scene.MENU; // La escena inicial será el Menú
+  
+  InitializeScene(); // Inicializamos la escena
 }
 
 //  DRAW
-
+ //<>//
 void draw()
 {
   background(255);
   
-  switch (actualScene) //<>//
+  switch (actualScene) // Dependiendo de en que escena nos encontremos, se ejecutará una código u otro
   {
     case MENU:
-      MainMenu();
+      MainMenu(); // Ejecutamos la Lógica del menú principal
       break;
     case LEVEL1:
-    
+      
          //Movimiento del PJ (WASD)
       if (keyPressed) {
-        if ((key == 'w' || key == 'W')) { // && Borders(0, pj_pos, pj_vel) && !WallBorder(0, pj_pos)) {
+        if ((key == 'w' || key == 'W') && Borders(0, pj_pos) && !WallBorder(0, pj_pos)) {
           pj_pos.y -= pj_vel * speedUp; // SpeedUp es 1 normalmente, cuando se recoge un item de velocidad se duplica
         }
-        else if ((key == 'd' || key == 'D')) { // && Borders(3, pj_pos, pj_vel) && !WallBorder(3, pj_pos)) {
+        else if ((key == 'd' || key == 'D') && Borders(3, pj_pos) && !WallBorder(3, pj_pos)) {
           pj_pos.x += pj_vel * speedUp;
         }
-        else if ((key == 'a' || key == 'A')) { // && Borders(2, pj_pos, pj_vel) && !WallBorder(2, pj_pos)) {
+        else if ((key == 'a' || key == 'A') && Borders(2, pj_pos) && !WallBorder(2, pj_pos)) {
           pj_pos.x -= pj_vel * speedUp;
         }
-        else if ((key == 's' || key == 'S')) { // && Borders(1, pj_pos, pj_vel) && !WallBorder(1, pj_pos)) {
+        else if ((key == 's' || key == 'S') && Borders(1, pj_pos) && !WallBorder(1, pj_pos)) {
           pj_pos.y += pj_vel * speedUp;
         }
       }
@@ -308,7 +313,8 @@ void draw()
       }
       
       PNJLogic(); 
-          if (enemy_counter < N)
+      
+      if (enemy_counter < N)
       {
         EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = N(dejaran de spawnear más)
       }
@@ -327,10 +333,10 @@ void draw()
           GetItem(items[i]); // Logica de recoger el Item
           if (items[i].powerUp)
           {
-            powerUpsTaken ++;
-            if (powerUpsTaken >= POWER_UPS_REQUIRED)
+            powerUpsTaken ++; 
+            if (powerUpsTaken >= POWER_UPS_REQUIRED) // Si se han recogido los power ups requeridos, se pasa a la escena de victoria
             {
-                actualScene = Scene.VICTORY;
+                actualScene = Scene.VICTORY; // AQUÍ, EN VEZ DE PASAR A LA ESCENA DE VICTORIA DEBE ABRIRSE EL PORTAL A LA SALA DEL BOSS
                 InitializeScene();
             }
           }
@@ -349,12 +355,15 @@ void draw()
       
       break;
     case BOSS:
+    
+    // INTRODUCIR AQUÍ EL DRAW DE LA ESCENA DEL BOSS
+    
       break;
     case DEATH:
-      DeathScene();
+      DeathScene(); // Lógica de la escena de muerte
       break;
     case VICTORY:
-      VictoryScene();
+      VictoryScene(); // Lógica de la escena de victoria
       break;
     default:
   }
@@ -389,43 +398,44 @@ float MoveAway(float thisPoint, float finalPoint, float speed) // da la direcci�
   return move;
 }
 
-void mouseClicked()
+void mouseClicked() // Este código lo utilizamos para el UI. Se ejecuta cada vez que se clica el mouse
 {
   switch(actualScene)
   {
     case MENU:
-      if (N_plus.IsOver() && N < MAX_ENEMIES)
+      if (N_plus.IsOver() && N < MAX_ENEMIES) // Si el mouse está sobre el botón de aumentar el numero de enemigos 
+                                              // y el numero de enemigos es menor al numero máximo, aumentamos el numero de enemigos
       {
         N++;
       }
-      if (N_minus.IsOver() && N > MIN_ENEMIES)
+      if (N_minus.IsOver() && N > MIN_ENEMIES) // Exactamente lo mismo pero con el botón de reducir enemigos
       {
         N--;
       }
-      if (playButton.IsOver())
+      if (playButton.IsOver())  // Si está sobre el botón de play, inicializamos el LEVEL1
       {
         actualScene = playButton.sceneToGo;
         InitializeScene();
       }
-      if (mQuitButton.IsOver())
+      if (mQuitButton.IsOver()) // Si está sobre el botón de quit, cerramos el programa
       {
         exit();
       }
       break;
     case DEATH:
-      if (restartButton.IsOver())
+      if (restartButton.IsOver()) // Si está sobre el botón de restart, inicializa el LEVEL1
       {
         actualScene = restartButton.sceneToGo;
         InitializeScene();
       }
-      if (quitButton.IsOver())
+      if (quitButton.IsOver()) // Si está sobre el botón de Quit, vuelve al MainMenu
       {
         actualScene = quitButton.sceneToGo;
         InitializeScene();
       }
       break;
     case VICTORY:
-        if (restartButton.IsOver())
+        if (restartButton.IsOver()) // Lo mismo que en la escena DEATH
       {
         actualScene = restartButton.sceneToGo;
         InitializeScene();
@@ -459,12 +469,12 @@ Boolean FreeSpot(PVector pos, int index) // Devuelve true si encuentra un sitio 
 }
 
 
-boolean Borders(int dir, PVector p, float speed) // Las colisiones con los bordes de la pantalla
+boolean Borders(int dir, PVector p) // Las colisiones con los bordes de la pantalla
 {
   switch(dir) 
   {  
     case(0): //Arriba
-      if (p.y - speed < 0) // si la posicion p.y menos la velocidad és menor que 0 (colisiona con el borde superior)
+      if (p.y - pj_vel * speedUp < pj_size / 2) // si la posicion p.y menos la velocidad és menor que la mitad del size del pj (colisiona con el borde superior)
       {
         return false;
       }
@@ -473,7 +483,7 @@ boolean Borders(int dir, PVector p, float speed) // Las colisiones con los borde
         return true;
       }
     case(1): //Abajo
-      if (p.y + speed > height)
+      if (p.y + pj_vel * speedUp > height - pj_size / 2)
       {
         return false;
       }
@@ -482,7 +492,7 @@ boolean Borders(int dir, PVector p, float speed) // Las colisiones con los borde
         return true;
       }
     case(2): //Izquierda
-      if (p.x - speed < 0)
+      if (p.x - pj_vel * speedUp < pj_size / 2)
       {
         return false;
       }
@@ -491,7 +501,7 @@ boolean Borders(int dir, PVector p, float speed) // Las colisiones con los borde
         return true;
       }
     case(3): //Derecha
-      if (p.x + speed > width)
+      if (p.x + pj_vel * speedUp > width - pj_size / 2)
       {
         return false;
       }
@@ -504,25 +514,31 @@ boolean Borders(int dir, PVector p, float speed) // Las colisiones con los borde
   }
 }
 
-Boolean WallBorder(int dir, PVector p) // Indica si se está colisionando con un muro (no funciona)
+Boolean WallBorder(int dir, PVector p) // Indica si el pj está colisionando con un muro 
 {
-  PVector pos = new PVector(p.x,p.y);
+  boolean stop = false;                
+  PVector pv = new PVector(p.x, p.y);  //Creamos un nuevo PVector para no manipular la posicion del jugador
     switch(dir)
   {  
     case(0):
-      pos.y -= pj_size * 2;
-      return WallColision(p, pj_size);
+      pv.y -= pj_vel * speedUp; 
+      stop = WallColision(pv, pj_size); // Utilizamos la función que nos indica si el pnj ha colisionado con un muro, pasandole la supuesta posicion del player
+                                        // que tendría en el siguiente frame, de manera que si esta colisionase con el muro, no lo permitiremos
+      return stop;
     case(1):
-      pos.y += pj_size * 2;
-      return WallColision(p, pj_size);
+      pv.y += pj_vel * speedUp;
+      stop = WallColision(pv, pj_size);
+      return stop;
     case(2):
-      pos.x -= pj_size * 2;
-      return WallColision(p, pj_size);
+      pv.x -= pj_vel * speedUp;
+      stop = WallColision(pv, pj_size);
+      return stop;
     case(3):
-      pos.x += pj_size * 2;
-      return WallColision(p, pj_size);
+      pv.x += pj_vel * speedUp;
+      stop = WallColision(pv, pj_size);
+      return stop;
      default:
-     return false;
+     return stop;
   }
 }
 
@@ -568,7 +584,7 @@ Boolean WallColision(PVector p, int index) // Colision entre dos muros (para ini
 
     max_muro.x = muros[i].x + ancho_muro;
     max_muro.y = muros[i].y + alto_muro;
-     
+      //<>//
     if (p_max_x <= max_muro.x - ancho_muro || p_max_y <= max_muro.y - alto_muro || max_muro.x <= p_min_x || max_muro.y <= p_min_y) 
     {
       continue;
@@ -584,12 +600,12 @@ Boolean WallColision(PVector p, int index) // Colision entre dos muros (para ini
 // FUNCTIONS
 
 //Initializing functions:
-void InitializeScene() //<>//
+void InitializeScene() // Inicializa lo necesario en cada nueva escena
 {
   switch(actualScene)
   {
     case MENU:
-      InitializeButtons();
+      InitializeButtons(); 
       break;
     case LEVEL1:
       InitializePJ();
@@ -607,7 +623,7 @@ void InitializeScene() //<>//
       InitializeButtons();
       break;
     default:
-  }
+  } //<>//
 }
 
 void InitializePJ()
@@ -623,10 +639,10 @@ void InitializePJ()
   pj_pos = new PVector(w_half, h_half);
 }
 
-void InitializePNJs() //<>//
+void InitializePNJs() 
 {
   pnj1.vel = 0.1;
-  pnj1.size = 20.0;
+  pnj1.size = 20.0; //<>//
   pnj1.dist = 25.0;
   pnj1.tint = naranja;
   pnj2.vel = 0.15;
@@ -639,14 +655,15 @@ void InitializePNJs() //<>//
   do
   {
     pnj2.pos = new PVector(random(pnj2.size, width - pnj2.size), random (pnj2.size, height - pnj2.size));
-  } while (WallColision(pnj2.pos, pnj2.size + 1));
+  } while (WallColision(pnj2.pos, pnj2.size + 1)); // Miramos que el pnj2 no aparezca sobre un muro, para que no reciba daño. le sumamos 1 a la size para asegurarnos
+                                                   // de que está separado del muro ya que podria dar algun error si el pnj aparece a una distancia 0 del wall 
 }
 
 void InitializeWalls() //<>//
 {
   // El número de muros es un número aleatorio entre 6 y 20
   muros_num = (int)random(6, 20);
-  
+   //<>//
   // Inicializamos el array y la mida de los muros, también es aleatoria.
   muros = new PVector[muros_num];
   ancho_muro = width / random(5, 20);
@@ -699,7 +716,7 @@ void InitializeItems() //<>//
       case FREEZE:
         items[i].effectTime = FREEZE_TIME;
         break;
-      case INMORTAL:
+      case INMORTAL: //<>//
         items[i].effectTime = INMORTAL_TIME;
         break;
       case VENOM:
@@ -1080,24 +1097,26 @@ void GetDamage(Pnj pnj, float damage) // el pnj recibe daño
   pnj.hp -= damage;
 }
 
-void InitializeButtons()
+void InitializeButtons() // Inicializamos los botones dependiendo de la escena
 {
-  if (actualScene == Scene.MENU)
+  if (actualScene == Scene.MENU) 
   {    
-    label_pos = new PVector(w_half, h_half - MP_SIZE / 2);
-    N_plus = new Button();
-    N_minus = new Button();
-    playButton = new Button();
+    label_pos = new PVector(w_half, h_half - MP_SIZE / 2); // Designamos la posicion del recuadro en el que aparecerá el numero de enemigos
+    N_plus = new Button(); // Inicializamos el botón que aumentará el numero de enemigos
+    N_minus = new Button(); // Inicializamos el que restará
+    playButton = new Button(); 
     mQuitButton = new Button();
     
+    // Variables de los botones + y -
     N_plus.ancho = MP_SIZE;
     N_plus.alto = MP_SIZE;
-    N_plus.pos = new PVector(label_pos.x + ancho_label / 2, label_pos.y);
+    N_plus.pos = new PVector(label_pos.x + ancho_label / 2, label_pos.y); //La posición de ambos será dependiente de la posicion del recuadro label y su tamaño
     
     N_minus.ancho = MP_SIZE;
     N_minus.alto = MP_SIZE;
     N_minus.pos = new PVector(label_pos.x - ancho_label / 2, label_pos.y);
     
+    // Variables de los botones Play y Quit
     playButton.ancho = 200;
     playButton.alto = 75;
     playButton.pos = new PVector(w_half, h_half + 80);
@@ -1106,6 +1125,7 @@ void InitializeButtons()
     mQuitButton.alto = 50;
     mQuitButton.pos = new PVector(w_half, h_half + 160);
     
+    // Colores de todos los botones
     playButton.c_base = verde;
     playButton.c_over = verde_claro;
     mQuitButton.c_base = rojo;
@@ -1115,7 +1135,7 @@ void InitializeButtons()
     N_minus.c_base = rojo;
     N_minus.c_over = rojo_claro;
     
-    playButton.sceneToGo = Scene.LEVEL1;
+    playButton.sceneToGo = Scene.LEVEL1; // Escena a la que nos enviará el botón Play
   }
   else
   {
@@ -1143,7 +1163,7 @@ void InitializeButtons()
 void DrawButtons()
 {
   // restart Button
-  if (restartButton.IsOver())
+  if (restartButton.IsOver()) // Si el ratón está encima del botón, se pintará de un color u otro
   {
     fill(restartButton.c_over);
   }
@@ -1151,12 +1171,13 @@ void DrawButtons()
   {
     fill(restartButton.c_base);
   }
+  
   rectMode(CENTER);
-  rect(restartButton.pos.x, restartButton.pos.y, restartButton.ancho, restartButton.alto);
+  rect(restartButton.pos.x, restartButton.pos.y, restartButton.ancho, restartButton.alto); // Pintamos el recuadro
   fill(0);
   textSize(40);
-  textAlign(CENTER, CENTER);
-  text("RESTART", restartButton.pos.x, restartButton.pos.y);
+  textAlign(CENTER, CENTER); //Texto alineado vertical y horizontalmente con su posición
+  text("RESTART", restartButton.pos.x, restartButton.pos.y); // Pintamos el texto
   
   // quit Button
     if (quitButton.IsOver())
@@ -1175,13 +1196,13 @@ void DrawButtons()
   text("QUIT", quitButton.pos.x, quitButton.pos.y);
 }
 
-void DeathScene()
+void DeathScene() // Lógica de la Death Scene
 {
   fill(0);
   textSize(50);
   textAlign(CENTER);
-  text("YOU LOSE!", w_half, h_half - 50);
-  DrawButtons();
+  text("YOU LOSE!", w_half, h_half - 50); // Escribimos un texto que indique al jugador que ha fallado
+  DrawButtons(); // Dibujamos los botones
 }
 
 void VictoryScene()
@@ -1189,8 +1210,8 @@ void VictoryScene()
   fill(0);
   textSize(50);
   textAlign(CENTER);
-  text("YOU WIN!", w_half, h_half - 50);
-  DrawButtons();
+  text("YOU WIN!", w_half, h_half - 50); // Escribimos un texto que indique al jugador que ha ganado
+  DrawButtons(); // Dibujamos los botones
 }
 
 void MainMenu()
@@ -1198,10 +1219,10 @@ void MainMenu()
   // Draw Rectangles
   rectMode(CENTER);
   fill(200);
-  rect(label_pos.x, label_pos.y, MP_SIZE + 10, MP_SIZE + 10);
-  if (N < MAX_ENEMIES)
+  rect(label_pos.x, label_pos.y, MP_SIZE + 10, MP_SIZE + 10); // Primero dibujamos un cuadrado gris claro (label)
+  if (N < MAX_ENEMIES) // miramos si N es menor que el nº max de enemigos, si no es menor, este botón no se va a dibujar, indicando que hemos llegado al máximo
   {
-    if (N_plus.IsOver())
+    if (N_plus.IsOver()) // miramos si el ratón está sobre el botón para designar su color
     {
       fill(N_plus.c_over);
     }
@@ -1209,15 +1230,17 @@ void MainMenu()
     {
       fill(N_plus.c_base);
     }
-    rect(N_plus.pos.x, N_plus.pos.y, N_plus.ancho, N_plus.alto);
+    rect(N_plus.pos.x, N_plus.pos.y, N_plus.ancho, N_plus.alto); // Dibujamos el botón de aumentar el nº de enemigos
     fill(0);
     textSize(50); 
     textAlign(CENTER, CENTER);
-    text("+", label_pos.x + MP_SIZE * 1.25, label_pos.y);  
+    text("+", label_pos.x + MP_SIZE * 1.25, label_pos.y); // le escribimos un + para que sea más intuitivo
   }
+  
+  //Se repite el proceso con el botón de reducir el número de enemgios
   if(N > MIN_ENEMIES)
   {
-      if (N_minus.IsOver())
+      if (N_minus.IsOver()) 
     {
       fill(N_minus.c_over);
     }
@@ -1238,12 +1261,12 @@ void MainMenu()
   text(N, label_pos.x, label_pos.y);
   textSize(50);
   textAlign(CENTER, CENTER);
-  text("PURSUIT OF HAPPINESS", w_half, h_half - 100);
+  text("PURSUIT OF HAPPINESS", w_half, h_half - 100); // Escribimos el títlulo del juego
   textSize(15);
-  text("Nº ENEMIES", w_half, h_half - 55);
+  text("Nº ENEMIES", w_half, h_half - 55); // Escribimos nº enemies para que se entienda el significado del número
   
   // play Button
-  if (playButton.IsOver())
+  if (playButton.IsOver()) // miramos si el ratón está sobre el botón para designar su color
   {
     fill(playButton.c_over);
   }
