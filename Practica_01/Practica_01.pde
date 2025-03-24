@@ -21,13 +21,21 @@ static final float PJ_SIZE = 20;
 
 // Vida inicial del PNJ2
 static final float HP = 100;
+static final int VIDAS = 3;
 
 // MAX MIN enemigos
 static final int MIN_ENEMIES = 5;
 static final int MAX_ENEMIES = 20;
 
+// NUM DE BALAS
+static final int BULLET_NUM = 7;
+
 // MINUS PLUS BUTTONS SIZE
 static final int MP_SIZE = 40;
+
+// TIEMPO TOTAL PARA TERMINAR EL JUEGO
+static final int LIMIT_TIME = 60000; // 1 minuto en milisegundos (60000 ms)
+Timer countDownTimer;
 
 //Colores
 color morado = color(150, 0, 180); // Para el veneno
@@ -42,6 +50,7 @@ color azul = color(0, 0, 250); // Para el PNJ2
 color blanco = color(255, 255, 255); // Para la inmortalidad
 color turquesa = color(0, 250, 160); // Para el PJ
 color rosa = color(255, 160, 200); // Para el efecto inofensivo
+color rojo_transparente = color(255, 0, 0, 60);
 
 //Variables de muros
 PVector[] muros; // Contiene todos los muros
@@ -54,6 +63,7 @@ float pj_vel;
 float pj_size;
 PVector pj_pos;
 color pj_color;
+int score = 0;
 
 float alfa = 0.1;
 
@@ -82,6 +92,8 @@ public class Button { // Clase Boton
   {
     pos = new PVector(0,0);
     sceneToGo = Scene.MENU;
+    c_base = rojo;
+    c_over = rojo;
   }
   
   // Metodo para detectar si el ratón está sobre el botón
@@ -146,6 +158,7 @@ public class Pnj {
     float hp; 
     PVector pos;
     color tint; // Color del PNJ
+    int vidas = VIDAS;
     
    Pnj() //Constructor de la clase PNJ
    {
@@ -177,18 +190,61 @@ public class Enemy {
   }
 }
 
+class Bala {
+  boolean isVisible = true;
+  float size = 20;
+  PVector pos;
+  PVector dir;
+  float vel = 10;
+  int lado; // Guardamos el lado desde donde salió la bala
+  
+  Bala() {
+    pos = new PVector(-20,0);
+    dir = new PVector(0, 0);
+    lado = 0;
+  }
+  
+  void ResetBullet(PVector p, PVector d, int l)
+  {
+    isVisible = true;
+    pos = p;
+    dir = d;
+    lado = l;
+  }
+  
+  void Show() // Dibuja las balas
+  {
+      // Cambiar el color de la bala dependiendo del lado y la posición
+    if (lado == 0 || lado == 1) { // Para las balas horizontales
+      // Cambiar el color dependiendo de la posición 'x' (de izquierda a derecha)
+      int colorBala = (int)map(pos.x, 0, width, 0, 255); // Escalar 'x' para generar un valor entre 0 y 255
+      fill(colorBala, 255 - colorBala, 0); // Rango de colores (verde a rojo dependiendo de la posición en X)
+    } 
+    else 
+    { // Para las balas verticales
+      // Cambiar el color dependiendo de la posición 'y' (de arriba a abajo)
+      int colorBala = (int)map(pos.y, 0, height, 0, 255); // Escalar 'y' para generar un valor entre 0 y 255
+      fill(colorBala, 255 - colorBala, 0); // Rango de colores (verde a rojo dependiendo de la posición en Y)
+    }
+    ellipse(pos.x, pos.y, size, size);
+  }
+}
+
 public class Timer { // Timer para controlar el tiempo
   boolean isStarted; // indica si ha empezado a contar
   float finalTime; // tiempo al que se tiene que detener
+  float startTime = 0;
   
   void StartTimer(float time) // método que inicia el tiempo (recibe el tiempo que debe pasar en milis)
   {
     if (!isStarted) // Comprueva que el timer no se haya iniciado ya
     {
+       startTime = millis();
        finalTime = millis() + time; // El tiempo final es el tiempo transcurrido desde que se ha iniciado el programa + el tiempo que se desea esperar
        isStarted = true;
     }  
   }
+  
   boolean CheckTimer() // Comprueva si el timer ha terminado
   {
     if (millis() >= finalTime)
@@ -200,6 +256,11 @@ public class Timer { // Timer para controlar el tiempo
     {
       return false; // No ha terminado
     }
+  }
+  
+  int CurrentTime()
+  {
+    return (int)(finalTime - millis()) / 1000;
   }
   
   Timer()
@@ -218,12 +279,12 @@ int items_num;
 int powerUpsTaken;
 
 // Variables que indican el estado actual del player
-boolean poisoned = false;
+boolean poisoned = false; //<>//
 boolean frozen = false;
 boolean inmortal = false;
 boolean inofensive = false;
 
-float items_size = 10; 
+float items_size = 20; 
 float speedUp = 1; // la velocidad del PJ se multiplica por este valor, el cual cambia si se obtiene un item de velocidad
 color item_color = verde;
 
@@ -232,7 +293,7 @@ Enemy[] enemies; // Contiene todos los enemigos
 int N = MIN_ENEMIES; // Total de enemigos
 int enemy_counter = 0; // Cuenta los enemigos spawneados
 
-float enemySpawnTime = 5000; // Tiempo que tardan los enemigos en spawnear
+float enemySpawnTime = 3000; // Tiempo que tardan los enemigos en spawnear
 float enemySpeedTime = 2500; // Tiempo que tarda en variar la velocidad del enemy
 //Velocidad Max y min del enemy (variará dentro de este rango)
 float enemyMaxVel = 0.3;
@@ -250,6 +311,14 @@ Timer enemyTimer; // Se utiliza para paulatinar el spawn de enemigos
 PVector label_pos;
 float ancho_label = 100;
 
+//Variables del Boss
+
+float bossHP = 255;
+Bala bullet[];
+int bulletSpawnTime = 2000; // 2 segundos entre disparos
+
+Timer bulletTimer = new Timer();
+
 // Instancias de los botones
 Button playButton; 
 Button mQuitButton;
@@ -257,6 +326,11 @@ Button restartButton;
 Button quitButton;
 Button N_plus;
 Button N_minus;
+
+// Variables del portal de la sala del jefe
+
+int portal_w, portal_h;
+PVector portal_pos;
 
 // Guardamos la mitad de la pantalla w = witdh, h = height
 float w_half; 
@@ -287,38 +361,22 @@ void draw()
   switch (actualScene) // Dependiendo de en que escena nos encontremos, se ejecutará una código u otro
   {
     case MENU:
+    
       MainMenu(); // Ejecutamos la Lógica del menú principal
+      
       break;
     case LEVEL1:
-      
+    
          //Movimiento del PJ (WASD)
-      if (keyPressed) {
-        if ((key == 'w' || key == 'W') && Borders(0, pj_pos) && !WallBorder(0, pj_pos)) {
-          pj_pos.y -= pj_vel * speedUp; // SpeedUp es 1 normalmente, cuando se recoge un item de velocidad se duplica
-        }
-        else if ((key == 'd' || key == 'D') && Borders(3, pj_pos) && !WallBorder(3, pj_pos)) {
-          pj_pos.x += pj_vel * speedUp;
-        }
-        else if ((key == 'a' || key == 'A') && Borders(2, pj_pos) && !WallBorder(2, pj_pos)) {
-          pj_pos.x -= pj_vel * speedUp;
-        }
-        else if ((key == 's' || key == 'S') && Borders(1, pj_pos) && !WallBorder(1, pj_pos)) {
-          pj_pos.y += pj_vel * speedUp;
-        }
-      }
-      if (using_mouse)
-      {
-        pj_pos.y = mouseY;
-        pj_pos.x = mouseX;
-      }
+      PJMove();
       
       PNJLogic(); 
       
       if (enemy_counter < N)
       {
-        EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = N(dejaran de spawnear más)
+        EnemySpawn(); //Cuando hayan spawneado todos los enemigos => enemy_counter = N(dejaran de spawnear más) //<>//
       }
-      
+        
       if (WallColision(pnj2.pos, pnj2.size) && !inmortal)
       {
           GetDamage(pnj2, WallDamage); // Si el PNJ2 colisiona con un muro, recibe daño
@@ -334,11 +392,11 @@ void draw()
           if (items[i].powerUp)
           {
             powerUpsTaken ++; 
-            if (powerUpsTaken >= POWER_UPS_REQUIRED) // Si se han recogido los power ups requeridos, se pasa a la escena de victoria
-            {
-                actualScene = Scene.VICTORY; // AQUÍ, EN VEZ DE PASAR A LA ESCENA DE VICTORIA DEBE ABRIRSE EL PORTAL A LA SALA DEL BOSS
-                InitializeScene();
-            }
+            score += 500;
+          }
+          else
+          {
+            score += 50;
           }
         }
       }
@@ -350,22 +408,152 @@ void draw()
         pnj2.hp -= VENOM_DAMAGE; // El item de veneno daña al PNJ2
       }
       
+      if (countDownTimer.CheckTimer())
+      {
+        PierdeVida();
+      }
+      
+      DrawInstances(); // Dibujamos las instancias
+      DrawHUD(); // Dibujamos el HUD
+      
+      if (powerUpsTaken >= POWER_UPS_REQUIRED)
+      {
+        fill(amarillo);
+        rectMode(CENTER);
+        rect(portal_pos.x, portal_pos.y, portal_w, portal_h);
+        if (PortalColision(pj_pos, pj_size))
+        {
+          actualScene = Scene.BOSS;
+          InitializeScene();
+        }
+      }
+      
+      break;
+    case BOSS:   
+      background(0);
+      rojo_transparente = color(255, 0, 0, bossHP);
+      fill(rojo_transparente);
+      ellipse(w_half, h_half, 200, 200);
+      PJMove();
+      
+      // Generar balas con patrón aleatorio cada 2 segundos
+      if (bulletTimer.isStarted)
+      {
+        if (bulletTimer.CheckTimer())
+        {
+          SpawnBullet(int(random(4)));
+        }
+      }
+      else
+      {
+        bulletTimer.StartTimer(bulletSpawnTime);
+      }
+      
+      // Mover y dibujar balas
+      for (int i = 0; i < BULLET_NUM; i++) 
+      {
+        BulletMove(bullet[i]);
+      //  bullet[i].Move();
+        if (bullet[i].isVisible)
+        {
+          bullet[i].Show();
+          if (DistanceBetween(bullet[i].pos, pnj2.pos) <= (bullet[i].size + pnj2.size) / 2)
+          {
+            GetDamage(pnj2, enemyDamage * 50);
+            bullet[i].isVisible = false;
+          }
+          if (DistanceBetween(bullet[i].pos, pnj1.pos) <= (bullet[i].size + pnj1.size) / 2)
+          {
+            bullet[i].isVisible = false;
+          }
+        }              
+      }      
+      
+      PNJLogic();
+
+      EnemySpawn(); 
+
+      if (bossHP <= 0)
+      {
+        actualScene = Scene.VICTORY;
+        InitializeScene();
+      }
+      
+      if (countDownTimer.CheckTimer())
+      {
+        PierdeVida();
+      }
+      
       DrawInstances(); // Dibujamos las instancias
       DrawHUD(); // Dibujamos el HUD
       
       break;
-    case BOSS:
-    
-    // INTRODUCIR AQUÍ EL DRAW DE LA ESCENA DEL BOSS
-    
-      break;
     case DEATH:
+    
       DeathScene(); // Lógica de la escena de muerte
+      
       break;
     case VICTORY:
+    
       VictoryScene(); // Lógica de la escena de victoria
+      
       break;
     default:
+  }
+}
+
+void PierdeVida()
+{
+    pnj2.vidas--;
+        if (pnj2.vidas > 0)
+        {
+          countDownTimer = new Timer();
+          countDownTimer.StartTimer(LIMIT_TIME);
+          score -= 500;
+          pnj2.hp = 100;
+        }
+        else
+        {  
+          actualScene = Scene.DEATH;
+          InitializeScene();
+        }  
+}
+
+void BulletMove(Bala bala)
+{
+    bala.pos.x += bala.dir.x * bala.vel;
+    bala.pos.y += bala.dir.y * bala.vel;
+}
+
+// Función para generar 5 balas (número de balas - 1) con un patrón aleatorio desde un lado aleatorio
+void SpawnBullet(int lado) 
+{
+  for (int i = 0; i < BULLET_NUM; i++) 
+  {
+    PVector coord = new PVector(0,0);
+    PVector dir = new PVector(0,0);
+    
+    float pos = ((i) / float(BULLET_NUM - 1)); // Calcula la posición de cada bala
+    
+    switch (lado) {
+      case 0: // Derecha
+        coord = new PVector(width, height * pos);
+        dir.x = -1; // Se mueven a la izquierda
+      break;
+      case 1: // Izquierda
+        coord = new PVector(width, height * pos);
+        dir.x = 1; 
+      break;
+      case 2: // Arriba
+        coord = new PVector(width * pos, height);
+        dir.y = 1;
+      break;
+      case 3: // Abajo
+        coord = new PVector(width * pos, height);
+        dir.y = -1;
+      break;
+    }
+  bullet[i].ResetBullet(coord, dir, lado);
   }
 }
 
@@ -396,7 +584,7 @@ float MoveAway(float thisPoint, float finalPoint, float speed) // da la direcci�
 {
   float move = (1.0 + speed * alfa) * thisPoint - speed * alfa * finalPoint;
   return move;
-}
+} //<>//
 
 void mouseClicked() // Este código lo utilizamos para el UI. Se ejecuta cada vez que se clica el mouse
 {
@@ -435,7 +623,7 @@ void mouseClicked() // Este código lo utilizamos para el UI. Se ejecuta cada ve
       }
       break;
     case VICTORY:
-        if (restartButton.IsOver()) // Lo mismo que en la escena DEATH
+        if (restartButton.IsOver()) // Lo mismo que en la escena DEATH //<>//
       {
         actualScene = restartButton.sceneToGo;
         InitializeScene();
@@ -454,7 +642,7 @@ void mouseClicked() // Este código lo utilizamos para el UI. Se ejecuta cada ve
 
 Boolean FreeSpot(PVector pos, int index) // Devuelve true si encuentra un sitio libre para instanciar un item
 {
-  if (WallColision(pos, items_size)) // Mira si está colisionando con un muro
+  if (WallColision(pos, items_size)) // Mira si está colisionando con un muro //<>//
   {
     return false;
   }
@@ -471,11 +659,11 @@ Boolean FreeSpot(PVector pos, int index) // Devuelve true si encuentra un sitio 
 
 boolean Borders(int dir, PVector p) // Las colisiones con los bordes de la pantalla
 {
-  switch(dir) 
+  switch(dir)  //<>//
   {  
     case(0): //Arriba
       if (p.y - pj_vel * speedUp < pj_size / 2) // si la posicion p.y menos la velocidad és menor que la mitad del size del pj (colisiona con el borde superior)
-      {
+      { //<>//
         return false;
       }
       else
@@ -492,7 +680,7 @@ boolean Borders(int dir, PVector p) // Las colisiones con los bordes de la panta
         return true;
       }
     case(2): //Izquierda
-      if (p.x - pj_vel * speedUp < pj_size / 2)
+      if (p.x - pj_vel * speedUp < pj_size / 2) //<>//
       {
         return false;
       }
@@ -528,7 +716,7 @@ Boolean WallBorder(int dir, PVector p) // Indica si el pj está colisionando con
     case(1):
       pv.y += pj_vel * speedUp;
       stop = WallColision(pv, pj_size);
-      return stop;
+      return stop; //<>//
     case(2):
       pv.x -= pj_vel * speedUp;
       stop = WallColision(pv, pj_size);
@@ -545,7 +733,7 @@ Boolean WallBorder(int dir, PVector p) // Indica si el pj está colisionando con
 Boolean WallColision(PVector p, float size) // Colision entre un PVector p y su size con algún muro
 {
   //Buscamos los puntos maximos y minimos de p
-    float p_max_x = p.x + size / 2; 
+    float p_max_x = p.x + size / 2;  //<>//
     float p_max_y = p.y + size / 2;
     float p_min_x = p.x - size / 2;
     float p_min_y = p.y - size / 2;
@@ -568,6 +756,24 @@ Boolean WallColision(PVector p, float size) // Colision entre un PVector p y su 
       }
     }
     return false;
+ }
+ 
+ Boolean PortalColision(PVector p, float size) // Colision entre un PVector p y su size con algún muro
+{
+  //Buscamos los puntos maximos y minimos de p
+    float p_max_x = p.x + size / 2; 
+    float p_max_y = p.y + size / 2;
+    float p_min_x = p.x - size / 2;
+    float p_min_y = p.y - size / 2;
+      
+    if (p_max_x <= portal_pos.x - portal_w / 2 || p_max_y <=  portal_pos.y - portal_h / 2 ||  portal_pos.x + portal_w / 2 <= p_min_x ||  portal_pos.y + portal_w / 2 <= p_min_y) //Buscamos si NO colisiona
+    {
+      return false;
+    }
+    else
+    {
+      return true;
+    }
  }
 
 Boolean WallColision(PVector p, int index) // Colision entre dos muros (para inicializarlos sin que está uno encima del otro)
@@ -605,25 +811,49 @@ void InitializeScene() // Inicializa lo necesario en cada nueva escena
   switch(actualScene)
   {
     case MENU:
+    
       InitializeButtons(); 
+      
       break;
     case LEVEL1:
+      countDownTimer = new Timer();
+      InitializePortal();
       InitializePJ();
       InitializeWalls();
       InitializePNJs();
       InitializeItems();
       InitializeEnemies();   
+      countDownTimer.StartTimer(LIMIT_TIME);
+      
       break;
     case BOSS:
+      bossHP = 255;
+      InitializeButtons(); 
+      InitializePJ();
+      InitializePNJs();
+      InitializeEnemies(); 
+      InitializeBullets();
+      
       break;
     case DEATH:
+    
       InitializeButtons();
+      
       break;
     case VICTORY:
+    
       InitializeButtons();
+      
       break;
     default:
   } //<>//
+}
+
+void InitializePortal()
+{
+  portal_w = 40;
+  portal_h = 40;
+  portal_pos = new PVector(random(0, width - portal_w), random(0, height - portal_h)); 
 }
 
 void InitializePJ()
@@ -683,7 +913,7 @@ void InitializeWalls() //<>//
 void InitializeItems() //<>//
 {
   //El número de ítems es un número aleatorio
-  items_num = (int)random(POWER_UPS_REQUIRED + 3, 12);
+  items_num = 6;
   
   //Inicializamos el array de ítems
   items = new Item[items_num];
@@ -743,6 +973,8 @@ void InitializeEnemies() //<>//
   for (int i = 0; i < N; i++)
   {
     enemies[i] = new Enemy();
+    enemies[i].isAwake = false;
+    enemies[i].isDead = false;
     if (i < N / 4) // Un 25% irá a por el pnj2
     {
       enemies[i].type = Enemy_type.PREDATOR; 
@@ -762,20 +994,42 @@ void InitializeEnemies() //<>//
   enemy_counter = 0;
 }
 
+void InitializeBullets()
+{
+  bullet = new Bala[BULLET_NUM];
+  for (int i = 0; i < BULLET_NUM; i++)
+  {
+    bullet[i] = new Bala();
+  }
+}
+
 // Draw functions:
 
 void DrawHUD() // Dibujar el HUD
 {
+  rectMode(CORNER);
   fill(rojo);
-  rect(10, 40, 200, 20);
+  rect(10, 10, 100, 10);
   fill(verde);
   if (pnj2.hp > 0)
   {
-    float anchoBarra = max(map(pnj2.hp, 0, 100, 0, 200), 0); // Evitar valores negativos.
-    rect(10, 40, anchoBarra, 20);
+    rect(10, 10, pnj2.hp, 10);
   }
+  if (actualScene == Scene.LEVEL1)
+  {
+    fill(0);
+  }
+  else
+  {
+    fill(255);
+  }
+  textSize(15);
+  textAlign(LEFT, CENTER); //Texto alineado vertical y horizontalmente con su posición
+  text("Vidas: " + pnj2.vidas, 115, 15); // Pintamos el texto
+  text("SCORE: " + score, 500, 15); 
+  textAlign(LEFT, CENTER);
+  text(countDownTimer.CurrentTime() + "s",  545, 30);
 }
-
 void DrawInstances() // Dibujamos las instancias
 {
    //DIBUJAR AL PJ:
@@ -802,7 +1056,7 @@ void DrawInstances() // Dibujamos las instancias
      rectMode(CENTER);
      for(int i = 0; i < muros_num; i++)
      {
-        fill(0,0,0);
+        fill(morado);
         rect(muros[i].x + ancho_muro/2.0, muros[i].y + alto_muro/2.0, ancho_muro, alto_muro);
      }
      
@@ -810,7 +1064,7 @@ void DrawInstances() // Dibujamos las instancias
      
      for(int i = 0; i < items_num; i++)
      {
-       if (!items[i].isTaken)
+       if (!items[i].isTaken && actualScene == Scene.LEVEL1)
        {
         fill(item_color);
         ellipse(items[i].pos.x, items[i].pos.y, items_size, items_size);
@@ -826,49 +1080,59 @@ void DrawEnemies(PVector enemy, float size)
 
 // Enemy Manager:
 
-void EnemySpawn()
+void EnemySpawn() //<>//
 {
-  enemyTimer.StartTimer(enemySpawnTime); // Inicia el timer
-
   if (enemyTimer.CheckTimer() && !frozen) // Chequea si el timer ha terminado (devuelve true/false)
   {
     GenerateEnemy(); // Genera enemigo
   }
 }
 
-void GenerateEnemy() {
+void GenerateEnemy() { //<>//
   int enemyId;
-  do 
+  if (powerUpsTaken < 3)
   {
-    enemyId = (int)random(0, N); // Generamos un index del array aleatorio, para que se cree un enemigo aleatorio de todo el array de enemigos
-  } while(enemies[enemyId].isAwake || enemies[enemyId].isDead); // Nos aseguramos que el enemigo no esté ya spawneado y que tampoco esté muerto
+    do 
+    {
+      enemyId = (int)random(0, N); // Generamos un index del array aleatorio, para que se cree un enemigo aleatorio de todo el array de enemigos
+    } while(enemies[enemyId].isAwake || enemies[enemyId].isDead); // Nos aseguramos que el enemigo no esté ya spawneado y que tampoco esté muerto
+    
+    enemies[enemyId].isAwake = true;
+    // Contador suma para que cuando llegue a N no spawneen más enemigos //<>//
+    if (enemy_counter < N) //<>//
+    {
+      enemyTimer.StartTimer(enemySpawnTime); // Iniciamos el timer del siguiente Spawn
+    }
+  }
+  else
+  {
+    enemyId = (int)random(0, N);
+    enemies[enemyId].isAwake = true; 
+    enemies[enemyId].isDead = false; 
+    enemyTimer.StartTimer(enemySpawnTime); 
+  }
   
   int spawn = int(random(4)); // Aparece en uno de los cuatro lados de manera aleatoria.
   switch (spawn) {
     case 0: // Arriba
-      enemies[enemy_counter].pos.x = random(width);
-      enemies[enemy_counter].pos.y = enemies[enemy_counter].size;
+      enemies[enemyId].pos.x = random(width);
+      enemies[enemyId].pos.y = enemies[enemyId].size;
       break;
     case 1: // Abajo
-      enemies[enemy_counter].pos.x = random(width);
-      enemies[enemy_counter].pos.y = height - enemies[enemy_counter].size;
+      enemies[enemyId].pos.x = random(width);
+      enemies[enemyId].pos.y = height - enemies[enemyId].size;
       break;
     case 2: // Izquierda
-      enemies[enemy_counter].pos.x = enemies[enemy_counter].size;
-      enemies[enemy_counter].pos.y = random(height);
+      enemies[enemyId].pos.x = enemies[enemyId].size;
+      enemies[enemyId].pos.y = random(height);
       break;
     case 3: // Derecha
-      enemies[enemy_counter].pos.x = width - enemies[enemy_counter].size;
-      enemies[enemy_counter].pos.y = random(height);
+      enemies[enemyId].pos.x = width - enemies[enemyId].size;
+      enemies[enemyId].pos.y = random(height);
       break;
      default:
   }  
-  enemies[enemyId].isAwake = true; 
-  enemy_counter++; // Contador suma para que cuando llegue a N no spawneen más enemigos
-  if (enemy_counter < N)
-  {
-    enemyTimer.StartTimer(enemySpawnTime); // Iniciamos el timer del siguiente Spawn
-  }
+   enemy_counter++;
 }
 
 // Items logic
@@ -981,6 +1245,29 @@ int NearEnemy() // Devuelve el index del array de enemigos que indica el enemigo
   return index;
 }
 
+void PJMove()
+{
+      if (keyPressed) {
+        if ((key == 'w' || key == 'W') && Borders(0, pj_pos) && !WallBorder(0, pj_pos)) {
+          pj_pos.y -= pj_vel * speedUp; // SpeedUp es 1 normalmente, cuando se recoge un item de velocidad se duplica
+        }
+        else if ((key == 'd' || key == 'D') && Borders(3, pj_pos) && !WallBorder(3, pj_pos)) {
+          pj_pos.x += pj_vel * speedUp;
+        }
+        else if ((key == 'a' || key == 'A') && Borders(2, pj_pos) && !WallBorder(2, pj_pos)) {
+          pj_pos.x -= pj_vel * speedUp;
+        }
+        else if ((key == 's' || key == 'S') && Borders(1, pj_pos) && !WallBorder(1, pj_pos)) {
+          pj_pos.y += pj_vel * speedUp;
+        }
+      }
+      if (using_mouse)
+      {
+        pj_pos.y = mouseY;
+        pj_pos.x = mouseX;
+      }
+}
+
 void PNJLogic()
 {
   for (int i = 0; i < N; i++)
@@ -1027,8 +1314,7 @@ void PNJLogic()
   
   if (pnj2.hp <= 0) // Si el hp es menor o igual a 0, muere.
   {
-    actualScene = Scene.DEATH;
-    InitializeScene();
+    PierdeVida();
   }
   
   // Enemies movement
@@ -1066,6 +1352,12 @@ void PNJLogic()
       if (DistanceBetween(pj_pos, enemies[i].pos) < pjEnemyOffset && !inofensive) // Si el pj colisiona con el enemy, lo mata
       {
         enemies[i].isDead = true;
+        score += 100;
+        if (actualScene == Scene.BOSS)
+        {
+          bossHP -= 25;
+          score += 50;
+        }
       }
       if (DistanceBetween(pnj2.pos, enemies[i].pos) < pnj2EnemyOffset && !inmortal) // Si el pnj2 colisiona con el enemy, recibe daño
       {
@@ -1095,6 +1387,7 @@ void EnemyVel(Enemy enemy) // Esta funcion varia la velocidad de los enemigos su
 void GetDamage(Pnj pnj, float damage) // el pnj recibe daño
 {
   pnj.hp -= damage;
+  score -= 1;
 }
 
 void InitializeButtons() // Inicializamos los botones dependiendo de la escena
@@ -1202,6 +1495,8 @@ void DeathScene() // Lógica de la Death Scene
   textSize(50);
   textAlign(CENTER);
   text("YOU LOSE!", w_half, h_half - 50); // Escribimos un texto que indique al jugador que ha fallado
+  textSize(20);
+  text("SCORE: " + score, w_half, h_half - 150); 
   DrawButtons(); // Dibujamos los botones
 }
 
@@ -1211,6 +1506,8 @@ void VictoryScene()
   textSize(50);
   textAlign(CENTER);
   text("YOU WIN!", w_half, h_half - 50); // Escribimos un texto que indique al jugador que ha ganado
+  textSize(20);
+  text("SCORE: " + score, w_half, h_half - 150); 
   DrawButtons(); // Dibujamos los botones
 }
 
